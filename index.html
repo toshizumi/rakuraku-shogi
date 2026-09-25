@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>らくらく将棋 - 超強化AI版</title>
+<style>
+  * { box-sizing: border-box; touch-action: manipulation; user-select: none; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "メイリオ", sans-serif;
+    background-color: #f4ece1;
+    margin: 0; padding: 10px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  h1 { margin: 5px 0; font-size: 24px; color: #333; }
+  #status { font-size: 20px; font-weight: bold; margin: 5px 0; color: #d32f2f; height: 32px; text-align: center; }
+  
+  .hand-container {
+    width: 92vw; max-width: 450px;
+    background-color: #d7ba89; border: 2px solid #5c3a21; border-radius: 6px;
+    padding: 5px; margin: 5px 0; display: flex; align-items: center; min-height: 48px;
+  }
+  .hand-title { font-size: 14px; font-weight: bold; margin-right: 8px; color: #4a2c11; }
+  .hand-pieces { display: flex; gap: 6px; flex-wrap: wrap; }
+  .hand-piece {
+    font-size: 20px; font-weight: bold; padding: 4px 8px;
+    background: #fdf6e3; border: 1px solid #8b5a2b; border-radius: 4px; cursor: pointer;
+  }
+  .hand-piece.selected { background-color: #ffeb3b; }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    width: 92vw; max-width: 450px;
+    height: 92vw; max-height: 450px;
+    border: 3px solid #5c3a21;
+    background-color: #e2b071;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.25);
+  }
+  .cell {
+    border: 1px solid #8b5a2b;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: bold; cursor: pointer;
+    min-width: 0; min-height: 0;
+  }
+  .cell.selected { background-color: #ffeb3b; }
+  .cell.movable { background-color: #a5d6a7; }
+  
+  .ai-piece { color: #c62828; transform: rotate(180deg); }
+  .player-piece { color: #111111; }
+  .promoted { color: #b71c1c; }
+
+  .btn {
+    margin-top: 10px; padding: 12px 28px; font-size: 20px; font-weight: bold;
+    background-color: #2e7d32; color: white; border: none; border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
+
+  #promote-modal {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100;
+  }
+  .modal-content { background: white; padding: 20px; border-radius: 12px; text-align: center; }
+  .modal-btn { font-size: 20px; padding: 10px 20px; margin: 10px; font-weight: bold; border-radius: 8px; border: none; }
+</style>
+</head>
+<body>
+
+<h1>らくらく将棋</h1>
+<div id="status">あなたの番です</div>
+
+<div class="hand-container">
+  <div class="hand-title">相手の持ち駒:</div>
+  <div id="ai-hand" class="hand-pieces"></div>
+</div>
+
+<div id="board"></div>
+
+<div class="hand-container">
+  <div class="hand-title">あなたの持ち駒:</div>
+  <div id="player-hand" class="hand-pieces"></div>
+</div>
+
+<button class="btn" onclick="resetGame()">最初からやり直す</button>
+
+<div id="promote-modal">
+  <div class="modal-content">
+    <p style="font-size: 22px; font-weight: bold;">成りますか？</p>
+    <button class="modal-btn" style="background:#4caf50; color:white;" onclick="handlePromoteChoice(true)">成る</button>
+    <button class="modal-btn" style="background:#9e9e9e; color:white;" onclick="handlePromoteChoice(false)">成らない</button>
+  </div>
+</div>
+
+<script>
+const KINDS = {
+  FU: "歩", KY: "香", KE: "桂", GI: "銀", KI: "金", KA: "角", HI: "飛", OU: "王",
+  TO: "と", NY: "成香", NK: "成桂", NG: "成銀", UM: "馬", RY: "竜"
+};
+
+const PIECE_VALUES = {
+  FU: 100, KY: 300, KE: 450, GI: 600, KI: 700, KA: 900, HI: 1000, OU: 30000,
+  TO: 700, NY: 700, NK: 700, NG: 700, UM: 1300, RY: 1500
+};
+
+let board = [];
+let hands = { player: [], ai: [] };
+let turn = "player";
+let selected = null;
+let movable = [];
+let pendingMove = null;
+
+function resetGame() {
+  turn = "player";
+  selected = null;
+  movable = [];
+  hands = { player: [], ai: [] };
+  
+  board = [
+    [ {k:'KY',o:'ai'}, {k:'KE',o:'ai'}, {k:'GI',o:'ai'}, {k:'KI',o:'ai'}, {k:'OU',o:'ai'}, {k:'KI',o:'ai'}, {k:'GI',o:'ai'}, {k:'KE',o:'ai'}, {k:'KY',o:'ai'} ],
+    [ null, {k:'HI',o:'ai'}, null, null, null, null, null, {k:'KA',o:'ai'}, null ],
+    [ {k:'FU',o:'ai'}, {k:'FU',o:'ai'}, {k:'FU',o:'ai'}, {k:'FU',o:'ai'}, {k:'FU',o:'ai'}, {k:'FU',o:'ai'}, {k:'FU',o:'ai'}, {k:'FU',o:'ai'}, {k:'FU',o:'ai'} ],
+    [ null, null, null, null, null, null, null, null, null ],
+    [ null, null, null, null, null, null, null, null, null ],
+    [ null, null, null, null, null, null, null, null, null ],
+    [ {k:'FU',o:'player'}, {k:'FU',o:'player'}, {k:'FU',o:'player'}, {k:'FU',o:'player'}, {k:'FU',o:'player'}, {k:'FU',o:'player'}, {k:'FU',o:'player'}, {k:'FU',o:'player'}, {k:'FU',o:'player'} ],
+    [ null, {k:'KA',o:'player'}, null, null, null, null, null, {k:'HI',o:'player'}, null ],
+    [ {k:'KY',o:'player'}, {k:'KE',o:'player'}, {k:'GI',o:'player'}, {k:'KI',o:'player'}, {k:'OU',o:'player'}, {k:'KI',o:'player'}, {k:'GI',o:'player'}, {k:'KE',o:'player'}, {k:'KY',o:'player'} ]
+  ];
+
+  document.getElementById('status').textContent = 'あなたの番です';
+  document.getElementById('status').style.color = '#d32f2f';
+  render();
+}
+
+function getMoves(r, c, b = board) {
+  const p = b[r][c];
+  if (!p) return [];
+  const moves = [];
+  const dir = p.o === 'player' ? -1 : 1;
+
+  const addMove = (tr, tc) => {
+    if (tr < 0 || tr > 8 || tc < 0 || tc > 8) return false;
+    const target = b[tr][tc];
+    if (!target) { moves.push({r: tr, c: tc}); return true; }
+    if (target.o !== p.o) { moves.push({r: tr, c: tc}); }
+    return false;
+  };
+
+  const addRay = (dr, dc) => {
+    let tr = r + dr, tc = c + dc;
+    while (addMove(tr, tc)) { tr += dr; tc += dc; }
+  };
+
+  const k = p.k;
+  const isGold = ['KI','TO','NY','NK','NG'].includes(k);
+
+  if (k === 'FU') { addMove(r + dir, c); }
+  else if (k === 'KY') { addRay(dir, 0); }
+  else if (k === 'KE') { addMove(r + dir * 2, c - 1); addMove(r + dir * 2, c + 1); }
+  else if (k === 'GI') {
+    [dir, -dir].forEach(dr => [-1,0,1].forEach(dc => {
+      if (dr === dir || (dr === -dir && dc !== 0)) addMove(r + dr, c + dc);
+    }));
+  }
+  else if (isGold) {
+    [-1, 0, 1].forEach(dr => [-1, 0, 1].forEach(dc => {
+      if (dr === 0 && dc === 0) return;
+      if (dr === -dir && dc !== 0) return;
+      addMove(r + dr, c + dc);
+    }));
+  }
+  else if (k === 'OU') {
+    [-1,0,1].forEach(dr => [-1,0,1].forEach(dc => { if(dr!==0||dc!==0) addMove(r+dr, c+dc); }));
+  }
+  else if (k === 'HI') { addRay(1,0); addRay(-1,0); addRay(0,1); addRay(0,-1); }
+  else if (k === 'RY') {
+    addRay(1,0); addRay(-1,0); addRay(0,1); addRay(0,-1);
+    [-1,1].forEach(dr => [-1,1].forEach(dc => addMove(r+dr, c+dc)));
+  }
+  else if (k === 'KA') { addRay(1,1); addRay(1,-1); addRay(-1,1); addRay(-1,-1); }
+  else if (k === 'UM') {
+    addRay(1,1); addRay(1,-1); addRay(-1,1); addRay(-1,-1);
+    [-1,1].forEach(dr => addMove(r+dr, c)); [-1,1].forEach(dc => addMove(r, c+dc));
+  }
+
+  return moves;
+}
+
+function getDropMoves(owner, kind, b = board) {
+  const drops = [];
+  const pawnColumns = new Set();
+  if (kind === 'FU') {
+    for (let c = 0; c < 9; c++) {
+      for (let r = 0; r < 9; r++) {
+        const p = b[r][c];
+        if (p && p.o === owner && p.k === 'FU') {
+          pawnColumns.add(c);
+          break;
+        }
+      }
+    }
+  }
+
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (!b[r][c]) {
+        if (kind === 'FU' && pawnColumns.has(c)) continue;
+        drops.push({r, c});
+      }
+    }
+  }
+  return drops;
+}
+
+function getAllPseudoLegalMoves(owner, b = board, h = hands) {
+  const moves = [];
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (b[r][c] && b[r][c].o === owner) {
+        const ms = getMoves(r, c, b);
+        ms.forEach(m => moves.push({ type: 'move', fr: r, fc: c, tr: m.r, tc: m.c }));
+      }
+    }
+  }
+  if (h[owner].length > 0) {
+    const uniqueKinds = [...new Set(h[owner])];
+    uniqueKinds.forEach(kind => {
+      const drops = getDropMoves(owner, kind, b);
+      drops.forEach(d => moves.push({ type: 'drop', kind: kind, tr: d.r, tc: d.c }));
+    });
+  }
+  return moves;
+}
+
+function isInCheck(owner, b = board) {
+  let kingPos = null;
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (b[r][c] && b[r][c].k === 'OU' && b[r][c].o === owner) {
+        kingPos = { r, c };
+        break;
+      }
+    }
+  }
+  if (!kingPos) return false;
+
+  const opponent = owner === 'player' ? 'ai' : 'player';
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (b[r][c] && b[r][c].o === opponent) {
+        const ms = getMoves(r, c, b);
+        if (ms.some(m => m.r === kingPos.r && m.c === kingPos.c)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function getAllStrictLegalMoves(owner, b = board, h = hands) {
+  const pseudoMoves = getAllPseudoLegalMoves(owner, b, h);
+  const legalMoves = [];
+
+  pseudoMoves.forEach(m => {
+    const tempBoard = JSON.parse(JSON.stringify(b));
+    if (m.type === 'move') {
+      const movingPiece = tempBoard[m.fr][m.fc];
+      const canPromote = (owner === 'ai' ? m.tr >= 6 || m.fr >= 6 : m.tr <= 2 || m.fr <= 2) && ['FU','KY','KE','GI','KA','HI'].includes(movingPiece.k);
+      if (canPromote && owner === 'ai') {
+        const promMap = { FU:'TO', KY:'NY', KE:'NK', GI:'NG', KA:'UM', HI:'RY' };
+        movingPiece.k = promMap[movingPiece.k] || movingPiece.k;
+      }
+      tempBoard[m.tr][m.tc] = movingPiece;
+      tempBoard[m.fr][m.fc] = null;
+    } else {
+      tempBoard[m.tr][m.tc] = { k: m.kind, o: owner };
+    }
+
+    if (!isInCheck(owner, tempBoard)) {
+      legalMoves.push(m);
+    }
+  });
+
+  return legalMoves;
+}
+
+function handleCellClick(r, c) {
+  if (turn !== 'player') return;
+
+  if (selected && selected.handIndex !== undefined) {
+    if (movable.some(m => m.r === r && m.c === c)) {
+      const dropKind = hands.player[selected.handIndex];
+      
+      const tempBoard = JSON.parse(JSON.stringify(board));
+      tempBoard[r][c] = { k: dropKind, o: 'player' };
+      if (isInCheck('player', tempBoard)) {
+        alert('王手がかかっています！王手を解除してください。');
+        return;
+      }
+
+      hands.player.splice(selected.handIndex, 1);
+      board[r][c] = { k: dropKind, o: 'player' };
+      finishPlayerTurn();
+    } else {
+      selected = null; movable = []; render();
+    }
+    return;
+  }
+
+  const p = board[r][c];
+  if (p && p.o === 'player') {
+    selected = { r, c };
+    movable = getMoves(r, c);
+    render();
+    return;
+  }
+
+  if (selected && movable.some(m => m.r === r && m.c === c)) {
+    const fromP = board[selected.r][selected.c];
+    const canPromote = (r <= 2 || selected.r <= 2) && ['FU','KY','KE','GI','KA','HI'].includes(fromP.k);
+
+    if (canPromote) {
+      pendingMove = { fromR: selected.r, fromC: selected.c, toR: r, toC: c };
+      document.getElementById('promote-modal').style.display = 'flex';
+    } else {
+      const tempBoard = JSON.parse(JSON.stringify(board));
+      tempBoard[r][c] = tempBoard[selected.r][selected.c];
+      tempBoard[selected.r][selected.c] = null;
+      if (isInCheck('player', tempBoard)) {
+        alert('王手がかかっています！王手を解除してください。');
+        return;
+      }
+
+      executeMove(selected.r, selected.c, r, c, false);
+      finishPlayerTurn();
+    }
+  } else {
+    selected = null; movable = []; render();
+  }
+}
+
+function handlePromoteChoice(promote) {
+  document.getElementById('promote-modal').style.display = 'none';
+  if (pendingMove) {
+    const tempBoard = JSON.parse(JSON.stringify(board));
+    const p = tempBoard[pendingMove.fromR][pendingMove.fromC];
+    if (promote) {
+      const promMap = { FU:'TO', KY:'NY', KE:'NK', GI:'NG', KA:'UM', HI:'RY' };
+      p.k = promMap[p.k] || p.k;
+    }
+    tempBoard[pendingMove.toR][pendingMove.toC] = p;
+    tempBoard[pendingMove.fromR][pendingMove.fromC] = null;
+
+    if (isInCheck('player', tempBoard)) {
+      alert('王手がかかっています！王手を解除してください。');
+      pendingMove = null;
+      return;
+    }
+
+    executeMove(pendingMove.fromR, pendingMove.fromC, pendingMove.toR, pendingMove.toC, promote);
+    pendingMove = null;
+    finishPlayerTurn();
+  }
+}
+
+function executeMove(fr, fc, tr, tc, promote) {
+  const target = board[tr][tc];
+  
+  if (target) {
+    let rawKind = target.k;
+    const unpromote = { TO:'FU', NY:'KY', NK:'KE', NG:'GI', UM:'KA', RY:'HI' };
+    if (unpromote[rawKind]) rawKind = unpromote[rawKind];
+    hands[turn].push(rawKind);
+  }
+
+  const p = board[fr][fc];
+  if (promote) {
+    const promMap = { FU:'TO', KY:'NY', KE:'NK', GI:'NG', KA:'UM', HI:'RY' };
+    p.k = promMap[p.k] || p.k;
+  }
+  board[tr][tc] = p;
+  board[fr][fc] = null;
+}
+
+function selectHand(index) {
+  if (turn !== 'player') return;
+  const kind = hands.player[index];
+  selected = { handIndex: index };
+  movable = getDropMoves('player', kind);
+  render();
+}
+
+function finishPlayerTurn() {
+  selected = null; movable = []; render();
+
+  if (!isKingOnBoard('ai')) {
+    endGame('あなたの勝ちです！ 🎉');
+    return;
+  }
+
+  const aiMoves = getAllStrictLegalMoves('ai');
+  if (aiMoves.length === 0) {
+    endGame('詰みました！あなたの勝ちです！ 🎉');
+    return;
+  }
+
+  turn = 'ai';
+  document.getElementById('status').textContent = '相手（AI）が考えています...';
+  setTimeout(aiTurn, 200);
+}
+
+function isKingOnBoard(owner) {
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if (board[r][c] && board[r][c].k === 'OU' && board[r][c].o === owner) return true;
+    }
+  }
+  return false;
+}
+
+function endGame(message) {
+  turn = 'gameover';
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = message;
+  statusEl.style.color = '#2e7d32';
+  selected = null;
+  movable = [];
+  render();
+}
+
+// 静的盤面評価関数（AI視点：プラスならAI優勢）
+function evaluateBoard(b, h) {
+  let score = 0;
+
+  // 1. 盤上の駒の評価＋位置加点
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const p = b[r][c];
+      if (p) {
+        let val = PIECE_VALUES[p.k];
+        // 敵陣深くへの侵入評価
+        let posBonus = (p.o === 'ai') ? (r * 15) : ((8 - r) * 15);
+        
+        if (p.o === 'ai') score += (val + posBonus);
+        else score -= (val + posBonus);
+      }
+    }
+  }
+
+  // 2. 持ち駒の評価
+  h.ai.forEach(k => score += PIECE_VALUES[k] * 1.1);
+  h.player.forEach(k => score -= PIECE_VALUES[k] * 1.1);
+
+  return score;
+}
+
+// Minimax（アルファベータ枝刈り）探索関数（深さ3手）
+function minimax(b, h, depth, alpha, beta, isMaximizing) {
+  if (depth === 0) return evaluateBoard(b, h);
+
+  const owner = isMaximizing ? 'ai' : 'player';
+  const moves = getAllStrictLegalMoves(owner, b, h);
+
+  if (moves.length === 0) {
+    return isMaximizing ? -99999 : 99999; // 詰み状態
+  }
+
+  if (isMaximizing) {
+    let maxEval = -Infinity;
+    for (const m of moves) {
+      const { tempB, tempH } = applyMove(b, h, m, owner);
+      const evalVal = minimax(tempB, tempH, depth - 1, alpha, beta, false);
+      maxEval = Math.max(maxEval, evalVal);
+      alpha = Math.max(alpha, evalVal);
+      if (beta <= alpha) break; // 枝刈り
+    }
+    return maxEval;
+  } else {
+    let minEval = Infinity;
+    for (const m of moves) {
+      const { tempB, tempH } = applyMove(b, h, m, owner);
+      const evalVal = minimax(tempB, tempH, depth - 1, alpha, beta, true);
+      minEval = Math.min(minEval, evalVal);
+      beta = Math.min(beta, evalVal);
+      if (beta <= alpha) break; // 枝刈り
+    }
+    return minEval;
+  }
+}
+
+function applyMove(b, h, m, owner) {
+  const tempB = JSON.parse(JSON.stringify(b));
+  const tempH = JSON.parse(JSON.stringify(h));
+
+  if (m.type === 'move') {
+    const target = tempB[m.tr][m.tc];
+    if (target) {
+      let rawKind = target.k;
+      const unprom = { TO:'FU', NY:'KY', NK:'KE', NG:'GI', UM:'KA', RY:'HI' };
+      if (unprom[rawKind]) rawKind = unprom[rawKind];
+      tempH[owner].push(rawKind);
+    }
+    const p = tempB[m.fr][m.fc];
+    const canPromote = (owner === 'ai' ? m.tr >= 6 || m.fr >= 6 : m.tr <= 2 || m.fr <= 2) && ['FU','KY','KE','GI','KA','HI'].includes(p.k);
+    if (canPromote) {
+      const promMap = { FU:'TO', KY:'NY', KE:'NK', GI:'NG', KA:'UM', HI:'RY' };
+      p.k = promMap[p.k] || p.k;
+    }
+    tempB[m.tr][m.tc] = p;
+    tempB[m.fr][m.fc] = null;
+  } else {
+    const idx = tempH[owner].indexOf(m.kind);
+    if (idx !== -1) tempH[owner].splice(idx, 1);
+    tempB[m.tr][m.tc] = { k: m.kind, o: owner };
+  }
+
+  return { tempB, tempH };
+}
+
+// 思考ルーチン実行
+function aiTurn() {
+  if (turn !== 'ai') return;
+
+  const allMoves = getAllStrictLegalMoves('ai');
+
+  if (allMoves.length === 0) {
+    endGame('詰みました！あなたの勝ちです！ 🎉');
+    return;
+  }
+
+  let bestScore = -Infinity;
+  let bestMoves = [];
+
+  // アルファベータ法でベストな手を判定（深さ3手探索）
+  for (const m of allMoves) {
+    const { tempB, tempH } = applyMove(board, hands, m, 'ai');
+    const score = minimax(tempB, tempH, 2, -Infinity, Infinity, false);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestMoves = [m];
+    } else if (score === bestScore) {
+      bestMoves.push(m);
+    }
+  }
+
+  const chosen = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+
+  if (chosen.type === 'move') {
+    const canPromote = (chosen.tr >= 6 || chosen.fr >= 6) && ['FU','KY','KE','GI','KA','HI'].includes(board[chosen.fr][chosen.fc].k);
+    executeMove(chosen.fr, chosen.fc, chosen.tr, chosen.tc, canPromote);
+  } else {
+    const idx = hands.ai.indexOf(chosen.kind);
+    hands.ai.splice(idx, 1);
+    board[chosen.tr][chosen.tc] = { k: chosen.kind, o: 'ai' };
+  }
+
+  selected = null; movable = []; render();
+
+  if (!isKingOnBoard('player')) {
+    endGame('王が取られました。あなたの負けです...');
+    document.getElementById('status').style.color = '#c62828';
+    return;
+  }
+
+  const playerMoves = getAllStrictLegalMoves('player');
+  if (playerMoves.length === 0) {
+    endGame('詰みました。あなたの負けです...');
+    document.getElementById('status').style.color = '#c62828';
+    return;
+  }
+
+  turn = 'player';
+  document.getElementById('status').textContent = 'あなたの番です';
+}
+
+function render() {
+  const boardEl = document.getElementById('board');
+  boardEl.innerHTML = '';
+
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const p = board[r][c];
+
+      if (movable.some(m => m.r === r && m.c === c)) cell.classList.add('movable');
+      if (selected && selected.r === r && selected.c === c) cell.classList.add('selected');
+
+      if (p) {
+        cell.textContent = KINDS[p.k];
+        cell.classList.add(p.o === 'ai' ? 'ai-piece' : 'player-piece');
+        if (['TO','NY','NK','NG','UM','RY'].includes(p.k)) cell.classList.add('promoted');
+      }
+
+      cell.onclick = () => handleCellClick(r, c);
+      boardEl.appendChild(cell);
+    }
+  }
+
+  const pHandEl = document.getElementById('player-hand');
+  const aHandEl = document.getElementById('ai-hand');
+  pHandEl.innerHTML = ''; aHandEl.innerHTML = '';
+
+  hands.player.forEach((k, idx) => {
+    const el = document.createElement('div');
+    el.className = 'hand-piece player-piece';
+    if (selected && selected.handIndex === idx) el.classList.add('selected');
+    el.textContent = KINDS[k];
+    el.onclick = (e) => { e.stopPropagation(); selectHand(idx); };
+    pHandEl.appendChild(el);
+  });
+
+  hands.ai.forEach((k) => {
+    const div = document.createElement('div');
+    div.className = 'hand-piece ai-piece';
+    div.textContent = KINDS[k];
+    aHandEl.appendChild(div);
+  });
+}
+
+resetGame();
+</script>
+</body>
+</html>
