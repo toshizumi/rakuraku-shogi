@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; touch-action: manipulation; user-select: none; }
+  input { user-select: text; -webkit-user-select: text; }
   body {
     font-family: "Hiragino Kaku Gothic ProN", "メイリオ", sans-serif;
     background-color: #f4ece1;
@@ -67,6 +68,27 @@
   .modal-content { background: white; padding: 20px; border-radius: 12px; text-align: center; }
   .modal-btn { font-size: 20px; padding: 10px 20px; margin: 10px; font-weight: bold; border-radius: 8px; border: none; }
 
+  #move-count { font-size: 15px; color: #4a2c11; margin: 0 0 4px; }
+
+  .ranking {
+    width: 92vw; max-width: 450px; margin-top: 16px;
+    background-color: #fdf6e3; border: 2px solid #5c3a21; border-radius: 6px; padding: 8px 12px;
+  }
+  .ranking-title { font-size: 15px; font-weight: bold; color: #4a2c11; margin-bottom: 4px; }
+  #ranking { list-style: none; margin: 0; padding: 0; font-size: 15px; color: #222; }
+  #ranking li { display: flex; gap: 8px; padding: 4px 0; border-top: 1px solid #e0d2b4; }
+  #ranking li:first-child { border-top: none; }
+  #ranking .rank { width: 2.5em; font-weight: bold; }
+  #ranking .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #ranking .moves { width: 3.5em; text-align: right; }
+  #ranking .date { color: #666; font-size: 13px; white-space: nowrap; }
+  #ranking .empty { color: #888; padding: 4px 0; }
+
+  #name-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100; }
+  #name-modal .modal-content { width: 88vw; max-width: 340px; }
+  #name-input { width: 100%; font-size: 18px; padding: 8px; border: 1px solid #8b5a2b; border-radius: 6px; margin: 8px 0 4px; }
+
   /* 王手の筆文字表示 */
   #board-wrap { position: relative; width: 92vw; max-width: 450px; }
   #check-banner {
@@ -97,6 +119,7 @@
 
 <h1>らくらく将棋</h1>
 <div id="status">あなたの番です</div>
+<div id="move-count">0手</div>
 
 <div class="hand-container">
   <div class="hand-title">相手の持ち駒:</div>
@@ -114,6 +137,23 @@
 </div>
 
 <button class="btn" onclick="resetGame()">最初からやり直す</button>
+
+<div class="ranking">
+  <div class="ranking-title">ランキング（少ない手数で勝った順）</div>
+  <ol id="ranking"></ol>
+</div>
+
+<div id="name-modal">
+  <div class="modal-content">
+    <p id="name-modal-msg" style="font-size: 20px; font-weight: bold; margin: 0;"></p>
+    <p style="margin: 8px 0 0; font-size: 15px;">ランキングに登録する名前</p>
+    <input id="name-input" type="text" maxlength="12" placeholder="名前" autocomplete="off">
+    <div>
+      <button class="modal-btn" style="background:#4caf50; color:white;" onclick="handleNameSubmit(true)">登録</button>
+      <button class="modal-btn" style="background:#9e9e9e; color:white;" onclick="handleNameSubmit(false)">登録しない</button>
+    </div>
+  </div>
+</div>
 
 <div id="promote-modal">
   <div class="modal-content">
@@ -140,13 +180,16 @@ let turn = "player";
 let selected = null;
 let movable = [];
 let pendingMove = null;
+let moveCount = 0;
 
 function resetGame() {
   turn = "player";
   selected = null;
   movable = [];
   hands = { player: [], ai: [] };
-  
+  moveCount = 0;
+  updateMoveCount();
+
   board = [
     [ {k:'KY',o:'ai'}, {k:'KE',o:'ai'}, {k:'GI',o:'ai'}, {k:'KI',o:'ai'}, {k:'OU',o:'ai'}, {k:'KI',o:'ai'}, {k:'GI',o:'ai'}, {k:'KE',o:'ai'}, {k:'KY',o:'ai'} ],
     [ null, {k:'HI',o:'ai'}, null, null, null, null, null, {k:'KA',o:'ai'}, null ],
@@ -425,15 +468,16 @@ function selectHand(index) {
 
 function finishPlayerTurn() {
   selected = null; movable = []; render();
+  countMove();
 
   if (!isKingOnBoard('ai')) {
-    endGame('あなたの勝ちです！ 🎉');
+    endGame('あなたの勝ちです！ 🎉', true);
     return;
   }
 
   const aiMoves = getAllStrictLegalMoves('ai');
   if (aiMoves.length === 0) {
-    endGame('詰みました！あなたの勝ちです！ 🎉');
+    endGame('詰みました！あなたの勝ちです！ 🎉', true);
     return;
   }
 
@@ -453,7 +497,7 @@ function isKingOnBoard(owner) {
   return false;
 }
 
-function endGame(message) {
+function endGame(message, playerWon = false) {
   turn = 'gameover';
   const statusEl = document.getElementById('status');
   statusEl.textContent = message;
@@ -461,6 +505,85 @@ function endGame(message) {
   selected = null;
   movable = [];
   render();
+  if (playerWon) openNameModal();
+}
+
+// ---- 手数とランキング ----
+const RANKING_KEY = 'rakushogi-ranking';
+const LAST_NAME_KEY = 'rakushogi-last-name';
+const RANKING_MAX = 10;
+
+function countMove() {
+  moveCount++;
+  updateMoveCount();
+}
+
+function updateMoveCount() {
+  document.getElementById('move-count').textContent = moveCount + '手';
+}
+
+function loadRanking() {
+  try {
+    const list = JSON.parse(localStorage.getItem(RANKING_KEY) || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch (e) { return []; }
+}
+
+function saveRecord(name) {
+  const list = loadRanking();
+  list.push({ name, moves: moveCount, at: Date.now() });
+  list.sort((a, b) => a.moves - b.moves || a.at - b.at);
+  const trimmed = list.slice(0, RANKING_MAX);
+  try {
+    localStorage.setItem(RANKING_KEY, JSON.stringify(trimmed));
+    localStorage.setItem(LAST_NAME_KEY, name);
+  } catch (e) {}
+  renderRanking();
+}
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  const z = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '/' + z(d.getMonth() + 1) + '/' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
+}
+
+function renderRanking() {
+  const el = document.getElementById('ranking');
+  el.innerHTML = '';
+  const list = loadRanking();
+  if (list.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'まだ記録がありません。AIに勝つと登録できます。';
+    el.appendChild(li);
+    return;
+  }
+  list.forEach((rec, i) => {
+    const li = document.createElement('li');
+    const cell = (cls, text) => { const s = document.createElement('span'); s.className = cls; s.textContent = text; li.appendChild(s); };
+    cell('rank', (i + 1) + '位');
+    cell('name', rec.name);
+    cell('moves', rec.moves + '手');
+    cell('date', formatDate(rec.at));
+    el.appendChild(li);
+  });
+}
+
+function openNameModal() {
+  document.getElementById('name-modal-msg').textContent = moveCount + '手で勝ちました！';
+  const input = document.getElementById('name-input');
+  let last = '';
+  try { last = localStorage.getItem(LAST_NAME_KEY) || ''; } catch (e) {}
+  input.value = last;
+  document.getElementById('name-modal').style.display = 'flex';
+  setTimeout(() => input.focus(), 50);
+}
+
+function handleNameSubmit(register) {
+  document.getElementById('name-modal').style.display = 'none';
+  if (!register) return;
+  const name = document.getElementById('name-input').value.trim() || '名無し';
+  saveRecord(name);
 }
 
 // 静的盤面評価関数（AI視点：プラスならAI優勢）
@@ -591,6 +714,7 @@ function aiTurn() {
   }
 
   selected = null; movable = []; render();
+  countMove();
 
   if (!isKingOnBoard('player')) {
     endGame('王が取られました。あなたの負けです...');
@@ -668,6 +792,8 @@ function render() {
 }
 
 if (document.fonts && document.fonts.load) document.fonts.load('40px "Yuji Syuku"');
+document.getElementById('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleNameSubmit(true); });
+renderRanking();
 resetGame();
 </script>
 </body>
