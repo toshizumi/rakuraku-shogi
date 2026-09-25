@@ -1,0 +1,7 @@
+name = "rakuraku-shogi"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[[kv_namespaces]]
+binding = "RANKING"
+id = "21feb31eb40a47b892eb8e6d6f990d53"

@@ -509,9 +509,8 @@ function endGame(message, playerWon = false) {
 }
 
 // ---- 手数とランキング ----
-const RANKING_KEY = 'rakushogi-ranking';
+const RANKING_API = 'https://rakuraku-shogi.typersize.workers.dev/ranking';
 const LAST_NAME_KEY = 'rakushogi-last-name';
-const RANKING_MAX = 10;
 
 function countMove() {
   moveCount++;
@@ -522,23 +521,45 @@ function updateMoveCount() {
   document.getElementById('move-count').textContent = moveCount + '手';
 }
 
-function loadRanking() {
+// ランキングはみんなで共有するため、Cloudflare Workers 上のAPIに読み書きする
+async function loadRanking() {
+  renderRankingMessage('読み込み中...');
   try {
-    const list = JSON.parse(localStorage.getItem(RANKING_KEY) || '[]');
-    return Array.isArray(list) ? list : [];
-  } catch (e) { return []; }
+    const res = await fetch(RANKING_API, { cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    renderRanking(data.ranking || []);
+  } catch (e) {
+    renderRankingMessage('ランキングを読み込めませんでした。通信状態を確認して、ページを開き直してください。');
+  }
 }
 
-function saveRecord(name) {
-  const list = loadRanking();
-  list.push({ name, moves: moveCount, at: Date.now() });
-  list.sort((a, b) => a.moves - b.moves || a.at - b.at);
-  const trimmed = list.slice(0, RANKING_MAX);
+async function saveRecord(name) {
+  try { localStorage.setItem(LAST_NAME_KEY, name); } catch (e) {}
+  renderRankingMessage('登録中...');
   try {
-    localStorage.setItem(RANKING_KEY, JSON.stringify(trimmed));
-    localStorage.setItem(LAST_NAME_KEY, name);
-  } catch (e) {}
-  renderRanking();
+    const res = await fetch(RANKING_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, moves: moveCount })
+    });
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    renderRanking(data.ranking || []);
+    const statusEl = document.getElementById('status');
+    statusEl.textContent = data.rank ? `${data.rank}位に登録しました！ 🎉` : '登録しました（上位10件には入りませんでした）';
+  } catch (e) {
+    renderRankingMessage('登録できませんでした。通信状態を確認してください。');
+  }
+}
+
+function renderRankingMessage(text) {
+  const el = document.getElementById('ranking');
+  el.innerHTML = '';
+  const li = document.createElement('li');
+  li.className = 'empty';
+  li.textContent = text;
+  el.appendChild(li);
 }
 
 function formatDate(ts) {
@@ -547,17 +568,13 @@ function formatDate(ts) {
   return d.getFullYear() + '/' + z(d.getMonth() + 1) + '/' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
 }
 
-function renderRanking() {
-  const el = document.getElementById('ranking');
-  el.innerHTML = '';
-  const list = loadRanking();
+function renderRanking(list) {
   if (list.length === 0) {
-    const li = document.createElement('li');
-    li.className = 'empty';
-    li.textContent = 'まだ記録がありません。AIに勝つと登録できます。';
-    el.appendChild(li);
+    renderRankingMessage('まだ記録がありません。AIに勝つと登録できます。');
     return;
   }
+  const el = document.getElementById('ranking');
+  el.innerHTML = '';
   list.forEach((rec, i) => {
     const li = document.createElement('li');
     const cell = (cls, text) => { const s = document.createElement('span'); s.className = cls; s.textContent = text; li.appendChild(s); };
@@ -793,7 +810,7 @@ function render() {
 
 if (document.fonts && document.fonts.load) document.fonts.load('40px "Yuji Syuku"');
 document.getElementById('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleNameSubmit(true); });
-renderRanking();
+loadRanking();
 resetGame();
 </script>
 </body>
