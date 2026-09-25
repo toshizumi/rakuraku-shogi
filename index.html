@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>らくらく将棋 - 超強化AI版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; touch-action: manipulation; user-select: none; }
   body {
@@ -63,6 +66,31 @@
   }
   .modal-content { background: white; padding: 20px; border-radius: 12px; text-align: center; }
   .modal-btn { font-size: 20px; padding: 10px 20px; margin: 10px; font-weight: bold; border-radius: 8px; border: none; }
+
+  /* 王手の筆文字表示 */
+  #board-wrap { position: relative; width: 92vw; max-width: 450px; }
+  #check-banner {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none; opacity: 0; z-index: 50;
+    font-family: "Yuji Syuku", "Hiragino Mincho ProN", serif;
+    font-size: 38vw; line-height: 1; color: #1b1b1b;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 18px rgba(244, 236, 225, 0.9), 0 0 2px rgba(0,0,0,0.4);
+  }
+  @media (min-width: 490px) { #check-banner { font-size: 180px; } }
+  #check-banner.show { animation: brush-check 1.5s ease-out forwards; }
+  @keyframes brush-check {
+    0%   { opacity: 0; transform: scale(1.5) rotate(-6deg); filter: blur(8px); }
+    18%  { opacity: 1; transform: scale(1.0) rotate(-3deg); filter: blur(0); }
+    70%  { opacity: 1; transform: scale(1.0) rotate(-3deg); filter: blur(0); }
+    100% { opacity: 0; transform: scale(1.06) rotate(-3deg); filter: blur(3px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    @keyframes brush-check {
+      0%, 15% { opacity: 0; } 25%, 75% { opacity: 1; } 100% { opacity: 0; }
+    }
+  }
 </style>
 </head>
 <body>
@@ -75,7 +103,10 @@
   <div id="ai-hand" class="hand-pieces"></div>
 </div>
 
-<div id="board"></div>
+<div id="board-wrap">
+  <div id="board"></div>
+  <div id="check-banner" aria-live="polite">王手</div>
+</div>
 
 <div class="hand-container">
   <div class="hand-title">あなたの持ち駒:</div>
@@ -408,7 +439,9 @@ function finishPlayerTurn() {
 
   turn = 'ai';
   document.getElementById('status').textContent = '相手（AI）が考えています...';
-  setTimeout(aiTurn, 200);
+  const gaveCheck = isInCheck('ai');
+  if (gaveCheck) showCheck();
+  setTimeout(aiTurn, gaveCheck ? 1300 : 200);
 }
 
 function isKingOnBoard(owner) {
@@ -573,7 +606,20 @@ function aiTurn() {
   }
 
   turn = 'player';
-  document.getElementById('status').textContent = 'あなたの番です';
+  if (isInCheck('player')) {
+    showCheck();
+    document.getElementById('status').textContent = '王手！あなたの番です';
+  } else {
+    document.getElementById('status').textContent = 'あなたの番です';
+  }
+}
+
+// 「王手」を筆文字で盤の上に重ねて表示する
+function showCheck() {
+  const el = document.getElementById('check-banner');
+  el.classList.remove('show');
+  void el.offsetWidth; // 連続して王手がかかっても毎回アニメーションが再生されるようにする
+  el.classList.add('show');
 }
 
 function render() {
@@ -621,6 +667,7 @@ function render() {
   });
 }
 
+if (document.fonts && document.fonts.load) document.fonts.load('40px "Yuji Syuku"');
 resetGame();
 </script>
 </body>
