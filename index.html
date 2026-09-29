@@ -68,7 +68,37 @@
   .modal-content { background: white; padding: 20px; border-radius: 12px; text-align: center; }
   .modal-btn { font-size: 20px; padding: 10px 20px; margin: 10px; font-weight: bold; border-radius: 8px; border: none; }
 
-  #move-count { font-size: 15px; color: #4a2c11; margin: 0 0 4px; }
+  #move-count { font-size: 15px; color: #4a2c11; margin: 0; }
+  #last-moves { font-size: 15px; color: #4a2c11; margin: 2px 0 4px; display: flex; gap: 16px; }
+  #last-moves b { font-weight: bold; color: #111; }
+  #last-moves .ai-last { color: #c62828; }
+
+  .cell.last-player { box-shadow: inset 0 0 0 3px rgba(17, 17, 17, 0.55); }
+  .cell.last-ai { box-shadow: inset 0 0 0 3px rgba(198, 40, 40, 0.6); }
+
+  .panel {
+    width: 92vw; max-width: 450px; margin-top: 12px;
+    background-color: #fdf6e3; border: 2px solid #5c3a21; border-radius: 6px; padding: 8px 12px;
+  }
+  .panel-title { font-size: 15px; font-weight: bold; color: #4a2c11; margin-bottom: 4px; display: flex; align-items: center; }
+  .panel-title .spacer { flex: 1; }
+  .small-btn {
+    font-size: 13px; padding: 5px 10px; margin-left: 6px; border: 1px solid #8b5a2b; border-radius: 6px;
+    background: #fff; color: #4a2c11; font-weight: bold;
+  }
+  .small-btn:disabled { opacity: 0.4; }
+  #kifu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; max-height: 112px; overflow-y: auto; font-size: 14px; color: #222; }
+  #kifu-list li { width: 50%; padding: 2px 0; white-space: nowrap; }
+  #kifu-list li .n { display: inline-block; width: 2.2em; text-align: right; margin-right: 4px; color: #888; }
+  #kifu-list li.ai { color: #c62828; }
+  #kifu-list .empty, #saved-list .empty { width: 100%; color: #888; padding: 4px 0; }
+  #panel-msg { font-size: 13px; color: #2e7d32; min-height: 18px; margin-top: 4px; }
+  #saved-list { list-style: none; margin: 0; padding: 0; font-size: 14px; color: #222; }
+  #saved-list li { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px solid #e0d2b4; }
+  #saved-list li:first-child { border-top: none; }
+  #saved-list .date { flex: 1; }
+  #saved-list .win { color: #2e7d32; font-weight: bold; }
+  #saved-list .lose { color: #c62828; }
 
   .ranking {
     width: 92vw; max-width: 450px; margin-top: 16px;
@@ -120,6 +150,7 @@
 <h1>らくらく将棋</h1>
 <div id="status">あなたの番です</div>
 <div id="move-count">0手</div>
+<div id="last-moves"><span>あなた <b id="last-player">なし</b></span><span>相手 <b id="last-ai" class="ai-last">なし</b></span></div>
 
 <div class="hand-container">
   <div class="hand-title">相手の持ち駒:</div>
@@ -137,6 +168,20 @@
 </div>
 
 <button class="btn" onclick="resetGame()">最初からやり直す</button>
+
+<div class="panel">
+  <div class="panel-title">棋譜<span class="spacer"></span>
+    <button class="small-btn" id="copy-btn" onclick="copyKifu()">コピー</button>
+    <button class="small-btn" id="download-btn" onclick="downloadKifu()">ダウンロード</button>
+  </div>
+  <ol id="kifu-list"></ol>
+  <div id="panel-msg"></div>
+</div>
+
+<div class="panel">
+  <div class="panel-title">保存した棋譜（この端末）</div>
+  <ol id="saved-list"></ol>
+</div>
 
 <div class="ranking">
   <div class="ranking-title">ランキング（少ない手数で勝った順）</div>
@@ -181,6 +226,9 @@ let selected = null;
 let movable = [];
 let pendingMove = null;
 let moveCount = 0;
+let kifu = [];                          // 今の対局の指し手
+let lastMoves = { player: null, ai: null }; // 双方の最後の一手（盤上の印と表示に使う）
+let gameStartedAt = 0;
 
 function resetGame() {
   turn = "player";
@@ -189,6 +237,11 @@ function resetGame() {
   hands = { player: [], ai: [] };
   moveCount = 0;
   updateMoveCount();
+  kifu = [];
+  lastMoves = { player: null, ai: null };
+  gameStartedAt = Date.now();
+  renderKifu();
+  renderLastMoves();
 
   board = [
     [ {k:'KY',o:'ai'}, {k:'KE',o:'ai'}, {k:'GI',o:'ai'}, {k:'KI',o:'ai'}, {k:'OU',o:'ai'}, {k:'KI',o:'ai'}, {k:'GI',o:'ai'}, {k:'KE',o:'ai'}, {k:'KY',o:'ai'} ],
@@ -376,6 +429,7 @@ function handleCellClick(r, c) {
 
       hands.player.splice(selected.handIndex, 1);
       board[r][c] = { k: dropKind, o: 'player' };
+      recordMove('player', dropKind, null, null, r, c, false, true);
       finishPlayerTurn();
     } else {
       selected = null; movable = []; render();
@@ -450,6 +504,7 @@ function executeMove(fr, fc, tr, tc, promote) {
   }
 
   const p = board[fr][fc];
+  recordMove(turn, p.k, fr, fc, tr, tc, promote, false);
   if (promote) {
     const promMap = { FU:'TO', KY:'NY', KE:'NK', GI:'NG', KA:'UM', HI:'RY' };
     p.k = promMap[p.k] || p.k;
@@ -468,7 +523,6 @@ function selectHand(index) {
 
 function finishPlayerTurn() {
   selected = null; movable = []; render();
-  countMove();
 
   if (!isKingOnBoard('ai')) {
     endGame('あなたの勝ちです！ 🎉', true);
@@ -505,17 +559,191 @@ function endGame(message, playerWon = false) {
   selected = null;
   movable = [];
   render();
+  saveGame(playerWon);
   if (playerWon) openNameModal();
 }
+
+// ---- 棋譜 ----
+const KIFU_STORE_KEY = 'rakushogi-kifu';
+const KIFU_STORE_MAX = 20;
+const FILE_CHARS = ['１','２','３','４','５','６','７','８','９'];
+const RANK_CHARS = ['一','二','三','四','五','六','七','八','九'];
+const KIF_NAMES = { FU:'歩', KY:'香', KE:'桂', GI:'銀', KI:'金', KA:'角', HI:'飛', OU:'玉',
+                    TO:'と', NY:'成香', NK:'成桂', NG:'成銀', UM:'馬', RY:'龍' };
+
+// 盤の配列位置を将棋の表記（７六 など）に直す
+function squareText(r, c) { return FILE_CHARS[8 - c] + RANK_CHARS[r]; }
+function squareKif(r, c) { return String(9 - c) + String(r + 1); }
+
+function recordMove(side, kind, fr, fc, tr, tc, promote, isDrop) {
+  const prev = kifu[kifu.length - 1];
+  const same = prev && prev.tr === tr && prev.tc === tc;
+  const mark = side === 'player' ? '▲' : '△';
+  const name = KIF_NAMES[kind] + (promote ? '成' : '');
+  const sq = same ? '同　' : squareText(tr, tc);
+  const text = mark + sq + name + (isDrop ? '打' : '');
+  const origin = isDrop ? '打' : '(' + squareKif(fr, fc) + ')';
+  const kif = sq + name + origin;
+  kifu.push({ n: kifu.length + 1, side, text, kif, tr, tc });
+  moveCount = kifu.length;
+  updateMoveCount();
+
+  lastMoves[side] = { r: tr, c: tc };
+  const other = side === 'player' ? 'ai' : 'player';
+  if (lastMoves[other] && lastMoves[other].r === tr && lastMoves[other].c === tc) lastMoves[other] = null;
+
+  renderKifu();
+  renderLastMoves();
+}
+
+function renderLastMoves() {
+  const last = side => { for (let i = kifu.length - 1; i >= 0; i--) if (kifu[i].side === side) return kifu[i].text; return 'なし'; };
+  document.getElementById('last-player').textContent = last('player');
+  document.getElementById('last-ai').textContent = last('ai');
+}
+
+function renderKifu() {
+  const el = document.getElementById('kifu-list');
+  el.innerHTML = '';
+  if (kifu.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'まだ指していません。';
+    el.appendChild(li);
+  } else {
+    kifu.forEach(m => {
+      const li = document.createElement('li');
+      li.className = m.side;
+      const n = document.createElement('span'); n.className = 'n'; n.textContent = m.n;
+      li.appendChild(n);
+      li.appendChild(document.createTextNode(m.text));
+      el.appendChild(li);
+    });
+    el.scrollTop = el.scrollHeight;
+  }
+  document.getElementById('copy-btn').disabled = kifu.length === 0;
+  document.getElementById('download-btn').disabled = kifu.length === 0;
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function formatDateTime(ts) {
+  const d = new Date(ts);
+  return d.getFullYear() + '/' + pad2(d.getMonth() + 1) + '/' + pad2(d.getDate()) + ' ' +
+         pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+}
+
+// KIF形式（他の将棋アプリで読める棋譜ファイルの形式）の文字列を組み立てる
+function buildKif(game) {
+  let name = 'あなた';
+  try { name = localStorage.getItem(LAST_NAME_KEY) || name; } catch (e) {}
+  const lines = [
+    '# KIF形式棋譜ファイル',
+    '開始日時：' + formatDateTime(game.startedAt),
+    '終了日時：' + formatDateTime(game.endedAt),
+    '手合割：平手',
+    '先手：' + name,
+    '後手：らくらく将棋AI',
+    '手数----指手---------消費時間--'
+  ];
+  game.moves.forEach((m, i) => lines.push(String(i + 1).padStart(4, ' ') + ' ' + m.kif + '   ( 0:00/00:00:00)'));
+  const n = game.moves.length;
+  if (game.result === 'win') {
+    lines.push(String(n + 1).padStart(4, ' ') + ' 詰み');
+    lines.push('まで' + n + '手で先手の勝ち');
+  } else if (game.result === 'lose') {
+    lines.push(String(n + 1).padStart(4, ' ') + ' 投了');
+    lines.push('まで' + n + '手で後手の勝ち');
+  } else {
+    lines.push(String(n + 1).padStart(4, ' ') + ' 中断');
+  }
+  return lines.join('\n') + '\n';
+}
+
+function currentGame(result) {
+  return { startedAt: gameStartedAt, endedAt: Date.now(), result, moves: kifu.map(m => ({ kif: m.kif, text: m.text })) };
+}
+
+function loadSavedGames() {
+  try {
+    const list = JSON.parse(localStorage.getItem(KIFU_STORE_KEY) || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch (e) { return []; }
+}
+
+// 終局した対局をこの端末に保存する（新しい順に20局まで）
+function saveGame(playerWon) {
+  if (kifu.length === 0) return;
+  const list = loadSavedGames();
+  list.unshift(currentGame(playerWon ? 'win' : 'lose'));
+  try { localStorage.setItem(KIFU_STORE_KEY, JSON.stringify(list.slice(0, KIFU_STORE_MAX))); } catch (e) {}
+  renderSavedGames();
+}
+
+function renderSavedGames() {
+  const el = document.getElementById('saved-list');
+  el.innerHTML = '';
+  const list = loadSavedGames();
+  if (list.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = '対局が終わると、ここに棋譜が残ります。';
+    el.appendChild(li);
+    return;
+  }
+  list.forEach((g, i) => {
+    const li = document.createElement('li');
+    const date = document.createElement('span'); date.className = 'date';
+    date.textContent = formatDateTime(g.endedAt).slice(0, 16) + '　' + g.moves.length + '手';
+    const res = document.createElement('span'); res.className = g.result;
+    res.textContent = g.result === 'win' ? '勝ち' : '負け';
+    const copy = document.createElement('button'); copy.className = 'small-btn'; copy.textContent = 'コピー';
+    copy.onclick = () => copyText(buildKif(g));
+    const dl = document.createElement('button'); dl.className = 'small-btn'; dl.textContent = 'DL';
+    dl.onclick = () => downloadText(buildKif(g), g.endedAt);
+    li.appendChild(date); li.appendChild(res); li.appendChild(copy); li.appendChild(dl);
+    el.appendChild(li);
+  });
+}
+
+function showPanelMessage(text) {
+  const el = document.getElementById('panel-msg');
+  el.textContent = text;
+  clearTimeout(showPanelMessage.timer);
+  showPanelMessage.timer = setTimeout(() => { el.textContent = ''; }, 2500);
+}
+
+function copyText(text) {
+  const done = () => showPanelMessage('棋譜をコピーしました。将棋アプリに貼り付けられます。');
+  const fail = () => showPanelMessage('コピーできませんでした。ダウンロードをお使いください。');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, fail);
+  } else {
+    fail();
+  }
+}
+
+function downloadText(text, ts) {
+  const d = new Date(ts);
+  const fname = 'rakushogi_' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '_' + pad2(d.getHours()) + pad2(d.getMinutes()) + '.kif';
+  const blob = new Blob(['\uFEFF' + text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showPanelMessage(fname + ' を保存しました。');
+}
+
+function currentResult() {
+  if (turn !== 'gameover') return 'none';
+  return isKingOnBoard('ai') && getAllStrictLegalMoves('ai').length > 0 ? 'lose' : 'win';
+}
+function copyKifu() { copyText(buildKif(currentGame(currentResult()))); }
+function downloadKifu() { downloadText(buildKif(currentGame(currentResult())), Date.now()); }
 
 // ---- 手数とランキング ----
 const RANKING_API = 'https://rakuraku-shogi.typersize.workers.dev/ranking';
 const LAST_NAME_KEY = 'rakushogi-last-name';
-
-function countMove() {
-  moveCount++;
-  updateMoveCount();
-}
 
 function updateMoveCount() {
   document.getElementById('move-count').textContent = moveCount + '手';
@@ -728,10 +956,10 @@ function aiTurn() {
     const idx = hands.ai.indexOf(chosen.kind);
     hands.ai.splice(idx, 1);
     board[chosen.tr][chosen.tc] = { k: chosen.kind, o: 'ai' };
+    recordMove('ai', chosen.kind, null, null, chosen.tr, chosen.tc, false, true);
   }
 
   selected = null; movable = []; render();
-  countMove();
 
   if (!isKingOnBoard('player')) {
     endGame('王が取られました。あなたの負けです...');
@@ -775,6 +1003,8 @@ function render() {
 
       if (movable.some(m => m.r === r && m.c === c)) cell.classList.add('movable');
       if (selected && selected.r === r && selected.c === c) cell.classList.add('selected');
+      if (lastMoves.player && lastMoves.player.r === r && lastMoves.player.c === c) cell.classList.add('last-player');
+      if (lastMoves.ai && lastMoves.ai.r === r && lastMoves.ai.c === c) cell.classList.add('last-ai');
 
       if (p) {
         cell.textContent = KINDS[p.k];
@@ -811,6 +1041,7 @@ function render() {
 if (document.fonts && document.fonts.load) document.fonts.load('40px "Yuji Syuku"');
 document.getElementById('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleNameSubmit(true); });
 loadRanking();
+renderSavedGames();
 resetGame();
 </script>
 </body>
