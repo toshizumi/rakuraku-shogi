@@ -10,13 +10,22 @@
 <style>
   * { box-sizing: border-box; touch-action: manipulation; user-select: none; }
   input { user-select: text; -webkit-user-select: text; }
+  :root {
+    --bg: #f4ece1;
+    --board-bg: #e2b071;
+    --board-frame: #5c3a21;
+    --board-glow: 0 4px 8px rgba(0,0,0,0.25);
+    --title: #333;
+  }
   body {
     font-family: "Hiragino Kaku Gothic ProN", "メイリオ", sans-serif;
-    background-color: #f4ece1;
+    background-color: var(--bg);
     margin: 0; padding: 10px;
     display: flex; flex-direction: column; align-items: center;
+    transition: background-color 0.8s ease;
   }
-  h1 { margin: 5px 0; font-size: 24px; color: #333; }
+  .title-row { display: flex; align-items: center; gap: 10px; }
+  h1 { margin: 5px 0; font-size: 24px; color: var(--title); transition: color 0.8s ease; }
   #status { font-size: 20px; font-weight: bold; margin: 5px 0; color: #d32f2f; height: 32px; text-align: center; }
   
   .hand-container {
@@ -38,9 +47,10 @@
     grid-template-rows: repeat(9, 1fr);
     width: 92vw; max-width: 450px;
     height: 92vw; max-height: 450px;
-    border: 3px solid #5c3a21;
-    background-color: #e2b071;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.25);
+    border: 3px solid var(--board-frame);
+    background-color: var(--board-bg);
+    box-shadow: var(--board-glow);
+    transition: border-color 0.8s ease, background-color 0.8s ease, box-shadow 0.8s ease;
   }
   .cell {
     border: 1px solid #8b5a2b;
@@ -143,11 +153,90 @@
       0%, 15% { opacity: 0; } 25%, 75% { opacity: 1; } 100% { opacity: 0; }
     }
   }
+
+  /* ---- 形勢に応じた雰囲気（盤の外側だけを変え、マスと駒には触れない） ---- */
+  /* 優勢: 朝 */
+  body:not([data-fx="off"])[data-mood="good"] {
+    --bg: #faf6ee; --board-bg: #e9bd7c; --board-frame: #6b4a2a;
+    --board-glow: 0 4px 8px rgba(0,0,0,0.2), 0 0 26px rgba(212,175,55,0.5);
+  }
+  /* 劣勢: 曇り */
+  body:not([data-fx="off"])[data-mood="bad"] {
+    --bg: #d9dde3; --board-bg: #d4a468; --board-frame: #3f2d20;
+    --board-glow: 0 4px 10px rgba(0,0,0,0.35);
+  }
+  /* 危険: 夕暮れ。盤の縁がゆっくり赤く脈打つ */
+  body:not([data-fx="off"])[data-mood="danger"] {
+    --bg: #3a2323; --board-bg: #cf9c5f; --board-frame: #2a1a14; --title: #f4ece1;
+  }
+  body:not([data-fx="off"])[data-mood="danger"] #board { animation: heartbeat 2s ease-in-out infinite; }
+  @keyframes heartbeat {
+    0%, 100% { box-shadow: 0 4px 10px rgba(0,0,0,0.4), 0 0 0 0 rgba(229,57,53,0); }
+    50%      { box-shadow: 0 4px 10px rgba(0,0,0,0.4), 0 0 30px 8px rgba(229,57,53,0.75); }
+  }
+  /* 絶体絶命: サイケデリック。背景と盤の縁と王手の文字だけ */
+  body:not([data-fx="off"])[data-mood="doom"] {
+    --bg: #120a1e; --board-bg: #cf9c5f; --board-frame: #1a1026; --title: #ffffff;
+  }
+  body:not([data-fx="off"])[data-mood="doom"]::before {
+    content: ''; position: fixed; inset: 0; z-index: -1;
+    background: linear-gradient(135deg, #ff004c, #ff8a00, #ffe600, #00e676, #00b0ff, #7c4dff, #ff004c);
+    background-size: 400% 400%;
+    animation: psy-shift 6s linear infinite, psy-hue 6s linear infinite;
+  }
+  @keyframes psy-shift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+  @keyframes psy-hue { to { filter: hue-rotate(360deg); } }
+  body:not([data-fx="off"])[data-mood="doom"] #board { animation: psy-frame 3s linear infinite; }
+  @keyframes psy-frame {
+    0%   { box-shadow: 0 0 26px 8px #ff004c; }
+    25%  { box-shadow: 0 0 26px 8px #ffe600; }
+    50%  { box-shadow: 0 0 26px 8px #00e676; }
+    75%  { box-shadow: 0 0 26px 8px #00b0ff; }
+    100% { box-shadow: 0 0 26px 8px #ff004c; }
+  }
+  body:not([data-fx="off"])[data-mood="doom"] #check-banner {
+    color: transparent; text-shadow: none;
+    background: linear-gradient(90deg, #ff004c, #ffe600, #00e676, #00b0ff, #7c4dff);
+    -webkit-background-clip: text; background-clip: text;
+  }
+  /* 勝ち: 金の紙吹雪 */
+  body:not([data-fx="off"])[data-mood="win"] {
+    --bg: #fbf3dc; --board-glow: 0 4px 8px rgba(0,0,0,0.2), 0 0 32px rgba(212,175,55,0.65);
+  }
+  /* 負け: 墨が広がって灰色に沈む */
+  body:not([data-fx="off"])[data-mood="lose"] {
+    --bg: #6b6b6b; --board-bg: #b9a389; --board-frame: #333333; --title: #f4ece1;
+  }
+  #fx-layer { position: fixed; inset: 0; pointer-events: none; z-index: 60; overflow: hidden; }
+  #fx-layer .ink {
+    position: absolute; inset: 0; opacity: 0; transition: opacity 2s ease;
+    background: radial-gradient(circle at 50% 40%, rgba(20,20,20,0.5) 0%, rgba(20,20,20,0.3) 60%, rgba(20,20,20,0.1) 100%);
+  }
+  body:not([data-fx="off"])[data-mood="lose"] #fx-layer .ink { opacity: 1; }
+  .confetti {
+    position: absolute; top: -16px; width: 10px; height: 14px; opacity: 0.9; border-radius: 2px;
+    animation: fall linear forwards;
+  }
+  @keyframes fall {
+    0%   { transform: translateY(0) rotate(0deg); }
+    100% { transform: translateY(110vh) rotate(720deg); }
+  }
+  /* 暗い背景のときは文字の後ろに紙色の帯を敷いて読めるようにする */
+  body:not([data-fx="off"]):is([data-mood="danger"], [data-mood="doom"], [data-mood="lose"]) :is(#status, #move-count, #last-moves) {
+    background: rgba(253,246,227,0.92); padding: 0 12px; border-radius: 6px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body[data-mood] #board, body[data-mood]::before { animation: none !important; }
+    .confetti { display: none; }
+  }
 </style>
 </head>
 <body>
 
-<h1>らくらく将棋</h1>
+<div class="title-row">
+  <h1>らくらく将棋</h1>
+  <button id="fx-toggle" class="small-btn" onclick="toggleFx()">演出 オン</button>
+</div>
 <div id="status">あなたの番です</div>
 <div id="move-count">0手</div>
 <div id="last-moves"><span>あなた <b id="last-player">なし</b></span><span>相手 <b id="last-ai" class="ai-last">なし</b></span></div>
@@ -200,6 +289,8 @@
   </div>
 </div>
 
+<div id="fx-layer"><div class="ink"></div></div>
+
 <div id="promote-modal">
   <div class="modal-content">
     <p style="font-size: 22px; font-weight: bold;">成りますか？</p>
@@ -240,6 +331,7 @@ function resetGame() {
   kifu = [];
   lastMoves = { player: null, ai: null };
   gameStartedAt = Date.now();
+  setMood('even');
   renderKifu();
   renderLastMoves();
 
@@ -560,6 +652,7 @@ function endGame(message, playerWon = false) {
   movable = [];
   render();
   saveGame(playerWon);
+  setMood(playerWon ? 'win' : 'lose');
   if (playerWon) openNameModal();
 }
 
@@ -981,6 +1074,59 @@ function aiTurn() {
   } else {
     document.getElementById('status').textContent = 'あなたの番です';
   }
+  updateMood();
+}
+
+// ---- 形勢に応じた雰囲気 ----
+// AIの盤面評価（AI視点）を符号反転してあなた視点の点数にし、5段階に分ける
+const FX_KEY = 'rakushogi-fx';
+
+function judgeMood() {
+  const score = -evaluateBoard(board, hands);
+  if (score <= -2500) return 'doom';
+  if (score <= -1000 || isInCheck('player')) return 'danger';
+  if (score <= -600) return 'bad';
+  if (score >= 600) return 'good';
+  return 'even';
+}
+
+function setMood(mood) {
+  document.body.dataset.mood = mood;
+  const layer = document.getElementById('fx-layer');
+  layer.querySelectorAll('.confetti').forEach(el => el.remove());
+  if (mood === 'win' && !fxOff()) spawnConfetti(layer);
+}
+
+function updateMood() { setMood(judgeMood()); }
+
+function spawnConfetti(layer) {
+  const colors = ['#d4af37', '#f1c40f', '#fff3b0', '#c9a227'];
+  for (let i = 0; i < 40; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti';
+    el.style.left = (Math.random() * 100) + 'vw';
+    el.style.background = colors[i % colors.length];
+    el.style.animationDuration = (4 + Math.random() * 3) + 's';
+    el.style.animationDelay = (Math.random() * 2) + 's';
+    el.addEventListener('animationend', () => el.remove());
+    layer.appendChild(el);
+  }
+}
+
+function fxOff() {
+  try { return localStorage.getItem(FX_KEY) === 'off'; } catch (e) { return false; }
+}
+
+function applyFxSetting() {
+  const off = fxOff();
+  if (off) document.body.dataset.fx = 'off'; else delete document.body.dataset.fx;
+  document.getElementById('fx-toggle').textContent = off ? '演出 オフ' : '演出 オン';
+}
+
+function toggleFx() {
+  try { localStorage.setItem(FX_KEY, fxOff() ? 'on' : 'off'); } catch (e) {}
+  applyFxSetting();
+  setMood(document.body.dataset.mood || 'even');
 }
 
 // 「王手」を筆文字で盤の上に重ねて表示する
@@ -1042,6 +1188,7 @@ if (document.fonts && document.fonts.load) document.fonts.load('40px "Yuji Syuku
 document.getElementById('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleNameSubmit(true); });
 loadRanking();
 renderSavedGames();
+applyFxSetting();
 resetGame();
 </script>
 </body>
