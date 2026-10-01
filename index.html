@@ -16,27 +16,31 @@
     --board-frame: #5c3a21;
     --board-glow: 0 4px 8px rgba(0,0,0,0.25);
     --title: #333;
+    /* 盤の一辺。幅92%・最大450px・画面の高さから上下の情報分(230px)を引いた値の小さい方。下限280px */
+    --board-size: min(92vw, 450px, max(280px, calc(100vh - 230px)));
+    --board-size: min(92vw, 450px, max(280px, calc(100dvh - 230px)));
   }
   body {
     font-family: "Hiragino Kaku Gothic ProN", "メイリオ", sans-serif;
     background-color: var(--bg);
-    margin: 0; padding: 10px;
+    margin: 0; padding: 6px 10px;
     display: flex; flex-direction: column; align-items: center;
     transition: background-color 0.8s ease;
   }
   .title-row { display: flex; align-items: center; gap: 10px; }
-  h1 { margin: 5px 0; font-size: 24px; color: var(--title); transition: color 0.8s ease; }
-  #status { font-size: 20px; font-weight: bold; margin: 5px 0; color: #d32f2f; height: 32px; text-align: center; }
+  .title-row .small-btn { font-size: 12px; padding: 3px 8px; }
+  h1 { margin: 0; font-size: 18px; color: var(--title); transition: color 0.8s ease; }
+  #status { font-size: 17px; font-weight: bold; margin: 2px 0; color: #d32f2f; line-height: 24px; min-height: 24px; text-align: center; }
   
   .hand-container {
-    width: 92vw; max-width: 450px;
+    width: var(--board-size);
     background-color: #d7ba89; border: 2px solid #5c3a21; border-radius: 6px;
-    padding: 5px; margin: 5px 0; display: flex; align-items: center; min-height: 48px;
+    padding: 3px 6px; margin: 4px 0; display: flex; align-items: center; min-height: 38px;
   }
-  .hand-title { font-size: 14px; font-weight: bold; margin-right: 8px; color: #4a2c11; }
+  .hand-title { font-size: 13px; font-weight: bold; margin-right: 8px; color: #4a2c11; }
   .hand-pieces { display: flex; gap: 6px; flex-wrap: wrap; }
   .hand-piece {
-    font-size: 20px; font-weight: bold; padding: 4px 8px;
+    font-size: 18px; font-weight: bold; padding: 3px 7px;
     background: #fdf6e3; border: 1px solid #8b5a2b; border-radius: 4px; cursor: pointer;
   }
   .hand-piece.selected { background-color: #ffeb3b; }
@@ -45,8 +49,8 @@
     display: grid;
     grid-template-columns: repeat(9, 1fr);
     grid-template-rows: repeat(9, 1fr);
-    width: 92vw; max-width: 450px;
-    height: 92vw; max-height: 450px;
+    width: var(--board-size);
+    height: var(--board-size);
     border: 3px solid var(--board-frame);
     background-color: var(--board-bg);
     box-shadow: var(--board-glow);
@@ -78,16 +82,15 @@
   .modal-content { background: white; padding: 20px; border-radius: 12px; text-align: center; }
   .modal-btn { font-size: 20px; padding: 10px 20px; margin: 10px; font-weight: bold; border-radius: 8px; border: none; }
 
-  #move-count { font-size: 15px; color: #4a2c11; margin: 0; }
-  #last-moves { font-size: 15px; color: #4a2c11; margin: 2px 0 4px; display: flex; gap: 16px; }
-  #last-moves b { font-weight: bold; color: #111; }
-  #last-moves .ai-last { color: #c62828; }
+  #info-line { font-size: 14px; color: #4a2c11; margin: 0 0 2px; display: flex; gap: 14px; line-height: 20px; white-space: nowrap; }
+  #info-line b { font-weight: bold; color: #111; }
+  #info-line .ai-last { color: #c62828; }
 
   .cell.last-player { box-shadow: inset 0 0 0 3px rgba(17, 17, 17, 0.55); }
   .cell.last-ai { box-shadow: inset 0 0 0 3px rgba(198, 40, 40, 0.6); }
 
   .panel {
-    width: 92vw; max-width: 450px; margin-top: 12px;
+    width: var(--board-size); margin-top: 12px;
     background-color: #fdf6e3; border: 2px solid #5c3a21; border-radius: 6px; padding: 8px 12px;
   }
   .panel-title { font-size: 15px; font-weight: bold; color: #4a2c11; margin-bottom: 4px; display: flex; align-items: center; }
@@ -111,7 +114,7 @@
   #saved-list .lose { color: #c62828; }
 
   .ranking {
-    width: 92vw; max-width: 450px; margin-top: 16px;
+    width: var(--board-size); margin-top: 16px;
     background-color: #fdf6e3; border: 2px solid #5c3a21; border-radius: 6px; padding: 8px 12px;
   }
   .ranking-title { font-size: 15px; font-weight: bold; color: #4a2c11; margin-bottom: 4px; }
@@ -130,17 +133,16 @@
   #name-input { width: 100%; font-size: 18px; padding: 8px; border: 1px solid #8b5a2b; border-radius: 6px; margin: 8px 0 4px; }
 
   /* 王手の筆文字表示 */
-  #board-wrap { position: relative; width: 92vw; max-width: 450px; }
+  #board-wrap { position: relative; width: var(--board-size); }
   #check-banner {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
     pointer-events: none; opacity: 0; z-index: 50;
     font-family: "Yuji Syuku", "Hiragino Mincho ProN", serif;
-    font-size: 38vw; line-height: 1; color: #1b1b1b;
+    font-size: calc(var(--board-size) * 0.4); line-height: 1; color: #1b1b1b;
     letter-spacing: 0.04em;
     text-shadow: 0 0 18px rgba(244, 236, 225, 0.9), 0 0 2px rgba(0,0,0,0.4);
   }
-  @media (min-width: 490px) { #check-banner { font-size: 180px; } }
   #check-banner.show { animation: brush-check 1.5s ease-out forwards; }
   @keyframes brush-check {
     0%   { opacity: 0; transform: scale(1.5) rotate(-6deg); filter: blur(8px); }
@@ -222,7 +224,7 @@
     100% { transform: translateY(110vh) rotate(720deg); }
   }
   /* 暗い背景のときは文字の後ろに紙色の帯を敷いて読めるようにする */
-  body:not([data-fx="off"]):is([data-mood="danger"], [data-mood="doom"], [data-mood="lose"]) :is(#status, #move-count, #last-moves) {
+  body:not([data-fx="off"]):is([data-mood="danger"], [data-mood="doom"], [data-mood="lose"]) :is(#status, #info-line) {
     background: rgba(253,246,227,0.92); padding: 0 12px; border-radius: 6px;
   }
   @media (prefers-reduced-motion: reduce) {
@@ -238,8 +240,7 @@
   <button id="fx-toggle" class="small-btn" onclick="toggleFx()">演出 オン</button>
 </div>
 <div id="status">あなたの番です</div>
-<div id="move-count">0手</div>
-<div id="last-moves"><span>あなた <b id="last-player">なし</b></span><span>相手 <b id="last-ai" class="ai-last">なし</b></span></div>
+<div id="info-line"><span id="move-count">0手</span><span>あなた <b id="last-player">なし</b></span><span>相手 <b id="last-ai" class="ai-last">なし</b></span></div>
 
 <div class="hand-container">
   <div class="hand-title">相手の持ち駒:</div>
