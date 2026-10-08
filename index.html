@@ -105,20 +105,20 @@
   #kifu-list li .tag { margin-left: 4px; font-size: 11px; color: #8b5a2b; }
   #kifu-list li .n { display: inline-block; width: 2.2em; text-align: right; margin-right: 4px; color: #888; }
   #kifu-list li.ai { color: #c62828; }
-  #kifu-list .empty, #saved-list .empty { width: 100%; color: #888; padding: 4px 0; }
+  #kifu-list .empty { width: 100%; color: #888; padding: 4px 0; }
   #panel-msg { font-size: 13px; color: #2e7d32; min-height: 18px; margin-top: 4px; }
-  #saved-list { list-style: none; margin: 0; padding: 0; font-size: 14px; color: #222; }
-  #saved-list li { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px solid #e0d2b4; }
-  #saved-list li:first-child { border-top: none; }
-  #saved-list .date { flex: 1; }
-  #saved-list .win { color: #2e7d32; font-weight: bold; }
-  #saved-list .lose { color: #c62828; }
 
   .ranking {
     width: var(--board-size); margin-top: 16px;
     background-color: #fdf6e3; border: 2px solid #5c3a21; border-radius: 6px; padding: 8px 12px;
   }
   .ranking-title { font-size: 15px; font-weight: bold; color: #4a2c11; margin-bottom: 4px; }
+  .rank-tabs { display: flex; gap: 4px; margin-bottom: 6px; border-bottom: 1px solid #e0d2b4; }
+  .rank-tab {
+    flex: 1; padding: 6px 4px; font: inherit; font-size: 14px; color: #8b5a2b; cursor: pointer;
+    background: none; border: none; border-bottom: 3px solid transparent; margin-bottom: -1px;
+  }
+  .rank-tab.active { color: #4a2c11; font-weight: bold; border-bottom-color: #5c3a21; }
   #ranking { list-style: none; margin: 0; padding: 0; font-size: 15px; color: #222; }
   #ranking li { display: flex; gap: 8px; padding: 4px 0; border-top: 1px solid #e0d2b4; }
   #ranking li:first-child { border-top: none; }
@@ -131,7 +131,41 @@
   #name-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100; }
   #name-modal .modal-content { width: 88vw; max-width: 340px; }
+  #opponent-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100; }
+  #opponent-modal .modal-content { width: 90vw; max-width: 360px; padding: 16px; }
+  #opponent-modal h2 { margin: 0 0 4px; font-size: 18px; color: #4a2c11; }
+  .opp-card {
+    position: relative; display: block; width: 100%; margin: 8px 0; padding: 10px 36px 10px 12px;
+    text-align: left; font: inherit; color: #4a2c11; cursor: pointer;
+    background: #fdf6e3; border: 2px solid #e0d2b4; border-radius: 8px;
+  }
+  .opp-card.current { border-color: #5c3a21; }
+  .opp-card.current::after { content: '✓'; position: absolute; top: 10px; right: 12px; font-size: 18px; font-weight: bold; color: #2e7d32; }
+  .opp-name { font-family: "Yuji Syuku", "Hiragino Mincho ProN", serif; font-size: 26px; line-height: 1.2; color: #c62828; }
+  .opp-style { margin-left: 8px; font-size: 13px; font-weight: bold; color: #8b5a2b; }
+  .opp-intro { margin-top: 2px; font-size: 14px; line-height: 1.5; }
+  #opponent-cancel { display: none; background: #9e9e9e; color: white; margin: 6px 0 0; }
   #name-input { width: 100%; font-size: 18px; padding: 8px; border: 1px solid #8b5a2b; border-radius: 6px; margin: 8px 0 4px; }
+
+  /* 相手のセリフの吹き出し。相手の持ち駒の欄から下へ、盤の上端に重ねて出す */
+  #ai-hand-box { position: relative; }
+  #speech {
+    position: absolute; left: 10px; top: calc(100% + 8px); z-index: 70; max-width: 82%;
+    padding: 6px 12px 7px; border: 2px solid #5c3a21; border-radius: 10px;
+    background: #fdf6e3; box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+    pointer-events: none; opacity: 0; transform: translateY(-4px) scale(0.96); transform-origin: 20px 0;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  #speech::before {
+    content: ''; position: absolute; top: -8px; left: 18px; width: 12px; height: 12px;
+    background: #fdf6e3; border-left: 2px solid #5c3a21; border-top: 2px solid #5c3a21; transform: rotate(45deg);
+  }
+  #speech.show { opacity: 1; transform: none; }
+  #speech .sp-name { display: block; font-size: 11px; font-weight: bold; color: #c62828; }
+  #speech .sp-text { display: block; font-size: 14px; line-height: 1.45; color: #4a2c11; }
+  body[data-fx="off"] #speech { transform: none; transition: opacity 0.15s; }
+  @media (prefers-reduced-motion: reduce) { #speech { transform: none; transition: opacity 0.15s; } }
 
   /* 王手の筆文字表示 */
   #board-wrap { position: relative; width: var(--board-size); }
@@ -160,21 +194,21 @@
   /* 戦法・囲いが成立したときの表示。墨の帯が走り、名前が浮かび、狙いの説明が続く */
   #strategy-banner {
     position: absolute; inset: 0; z-index: 49;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
     pointer-events: none; opacity: 0;
   }
   #strategy-banner .st-band {
-    position: relative; width: 100%; padding: 10px 0 12px;
+    position: relative; width: 100%; padding: 6px 0 8px;
     display: flex; flex-direction: column; align-items: center;
   }
   #strategy-banner .st-band::before {
     content: ''; position: absolute; inset: 0; z-index: -1;
-    background: rgba(24, 16, 10, 0.86);
+    background: rgba(24, 16, 10, 0.78);
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
     mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
     transform-origin: left center;
   }
-  #strategy-banner .st-label { font-size: 13px; font-weight: bold; color: #d4af37; letter-spacing: 0.2em; }
+  #strategy-banner .st-label { font-size: 12px; font-weight: bold; color: #d4af37; letter-spacing: 0.2em; }
   #strategy-banner .st-name {
     font-family: "Yuji Syuku", "Hiragino Mincho ProN", serif;
     line-height: 1.15; color: #fdf6e3; white-space: nowrap; letter-spacing: 0.06em;
@@ -182,34 +216,44 @@
   }
   #strategy-banner.ai .st-label { color: #ef9a9a; }
   #strategy-banner.ai .st-name { text-shadow: 0 0 14px rgba(229, 57, 53, 0.7); }
-  #strategy-banner .st-aim {
-    width: 86%; padding: 8px 12px; border: 2px solid #5c3a21; border-radius: 6px;
-    background: rgba(253, 246, 227, 0.96); color: #4a2c11;
-    font-size: 14px; line-height: 1.55; box-shadow: 0 3px 8px rgba(0,0,0,0.25);
-  }
-  #strategy-banner.show { animation: st-life var(--st-ms) linear forwards; }
-  #strategy-banner.show .st-band::before { animation: st-sweep var(--st-ms) ease-out forwards; }
-  #strategy-banner.show .st-name { animation: st-ink var(--st-ms) ease-out forwards; }
-  #strategy-banner.show .st-aim { animation: st-rise var(--st-ms) ease-out forwards; }
+  /* 盤の上には名前だけを短く出す。狙いの説明は盤の外の「戦法メモ」に残す */
+  #strategy-banner.show { animation: st-in 0.2s ease-out forwards; }
+  #strategy-banner.show .st-band::before { animation: st-sweep 0.4s ease-out both; }
+  #strategy-banner.show .st-name { animation: st-ink 0.6s ease-out 0.15s both; }
   #strategy-banner.show.out { animation: st-out 0.25s ease-in forwards; }
-  @keyframes st-life  { 0%, 90% { opacity: 1; } 100% { opacity: 0; } }
-  @keyframes st-sweep { 0% { transform: scaleX(0); } 8%, 100% { transform: scaleX(1); } }
+  @keyframes st-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes st-sweep { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   @keyframes st-ink {
-    0%, 5% { opacity: 0; transform: scale(1.25); filter: blur(8px); }
-    16%, 100% { opacity: 1; transform: scale(1); filter: blur(0); }
+    from { opacity: 0; transform: scale(1.25); filter: blur(8px); }
+    to   { opacity: 1; transform: scale(1); filter: blur(0); }
   }
-  @keyframes st-rise { 0%, 14% { opacity: 0; transform: translateY(12px); } 24%, 100% { opacity: 1; transform: none; } }
   @keyframes st-out { from { opacity: 1; } to { opacity: 0; } }
-  /* 演出オフや動きを減らす設定では、動かさずに名前と説明だけを出して消す */
-  body[data-fx="off"] #strategy-banner.show { animation-name: st-plain; }
+  /* 演出オフや動きを減らす設定では、動かさずに名前だけを出して消す */
   body[data-fx="off"] #strategy-banner.show .st-band::before,
-  body[data-fx="off"] #strategy-banner.show .st-name,
-  body[data-fx="off"] #strategy-banner.show .st-aim { animation: none; }
-  @keyframes st-plain { 0% { opacity: 0; } 4%, 92% { opacity: 1; } 100% { opacity: 0; } }
+  body[data-fx="off"] #strategy-banner.show .st-name { animation: none; }
   @media (prefers-reduced-motion: reduce) {
-    #strategy-banner.show { animation-name: st-plain; }
-    #strategy-banner.show .st-band::before, #strategy-banner.show .st-name, #strategy-banner.show .st-aim { animation: none; }
+    #strategy-banner.show .st-band::before, #strategy-banner.show .st-name { animation: none; }
   }
+
+  /* 戦法メモ。この対局でできた戦法と狙いを盤の外に残す */
+  #strategy-note {
+    width: var(--board-size); margin: 0 0 4px; padding: 6px 10px;
+    background: #fdf6e3; border: 2px solid #5c3a21; border-radius: 6px; color: #4a2c11;
+  }
+  #strategy-note .note-empty { font-size: 13px; color: #888; }
+  #strategy-note .note-head { display: flex; align-items: baseline; gap: 8px; }
+  #strategy-note .note-label { font-size: 12px; font-weight: bold; color: #8b5a2b; }
+  #strategy-note .note-current.ai .note-label { color: #c62828; }
+  #strategy-note .note-name { font-family: "Yuji Syuku", "Hiragino Mincho ProN", serif; font-size: 20px; line-height: 1.3; }
+  #strategy-note .note-aim { font-size: 13px; line-height: 1.55; }
+  #strategy-note .note-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  #strategy-note .note-chips:empty { display: none; }
+  .note-chip {
+    font: inherit; font-size: 12px; padding: 2px 8px; cursor: pointer;
+    background: #fff; color: #4a2c11; border: 1px solid #e0d2b4; border-radius: 12px;
+  }
+  .note-chip.ai { color: #c62828; }
+  .note-chip.active { border-color: #5c3a21; font-weight: bold; }
 
   /* ---- 形勢に応じた雰囲気（盤の外側だけを変え、マスと駒には触れない） ---- */
   /* 優勢: 朝 */
@@ -295,11 +339,12 @@
   <button id="fx-toggle" class="small-btn" onclick="toggleFx()">演出 オン</button>
 </div>
 <div id="status">あなたの番です</div>
-<div id="info-line"><span id="move-count">0手</span><span>あなた <b id="last-player">なし</b></span><span>相手 <b id="last-ai" class="ai-last">なし</b></span></div>
+<div id="info-line"><span id="move-count">0手</span><span>あなた <b id="last-player">なし</b></span><span><span id="ai-label">相手</span> <b id="last-ai" class="ai-last">なし</b></span></div>
 
-<div class="hand-container">
-  <div class="hand-title">相手の持ち駒:</div>
+<div class="hand-container" id="ai-hand-box">
+  <div class="hand-title" id="ai-hand-title">相手の持ち駒:</div>
   <div id="ai-hand" class="hand-pieces"></div>
+  <div id="speech" aria-live="polite"><span class="sp-name"></span><span class="sp-text"></span></div>
 </div>
 
 <div id="board-wrap">
@@ -307,7 +352,6 @@
   <div id="check-banner" aria-live="polite">王手</div>
   <div id="strategy-banner" aria-live="polite">
     <div class="st-band"><div class="st-label"></div><div class="st-name"></div></div>
-    <div class="st-aim"></div>
   </div>
 </div>
 
@@ -316,7 +360,9 @@
   <div id="player-hand" class="hand-pieces"></div>
 </div>
 
-<button class="btn" onclick="resetGame()">最初からやり直す</button>
+<div id="strategy-note" aria-live="polite"></div>
+
+<button class="btn" onclick="openOpponentModal(true)">新しい対局</button>
 
 <div class="panel">
   <div class="panel-title">棋譜<span class="spacer"></span>
@@ -327,14 +373,18 @@
   <div id="panel-msg"></div>
 </div>
 
-<div class="panel">
-  <div class="panel-title">保存した棋譜（この端末）</div>
-  <ol id="saved-list"></ol>
+<div class="ranking">
+  <div class="ranking-title" id="ranking-title">ランキング</div>
+  <div class="rank-tabs" id="rank-tabs" role="tablist"></div>
+  <ol id="ranking"></ol>
 </div>
 
-<div class="ranking">
-  <div class="ranking-title">ランキング（少ない手数で勝った順）</div>
-  <ol id="ranking"></ol>
+<div id="opponent-modal">
+  <div class="modal-content">
+    <h2>対戦相手を選ぶ</h2>
+    <div id="opponent-list"></div>
+    <button class="modal-btn" id="opponent-cancel" onclick="closeOpponentModal()">やめる</button>
+  </div>
 </div>
 
 <div id="name-modal">
@@ -381,6 +431,9 @@ let kifu = [];                          // 今の対局の指し手
 let lastMoves = { player: null, ai: null }; // 双方の最後の一手（盤上の印と表示に使う）
 let gameStartedAt = 0;
 let announced = { player: new Set(), ai: new Set(), both: new Set() }; // この対局で表示済みの戦法
+let opponent = null;                    // 選んだ対戦相手（OPPONENTS の1人）
+let lastAction = { side: null, captured: null, promoted: false }; // 直前の手で取った駒と成ったか（セリフに使う）
+let planDone = new Set();               // 相手の序盤の手順のうち、達成した項目の番号
 
 function resetGame() {
   turn = "player";
@@ -393,7 +446,9 @@ function resetGame() {
   lastMoves = { player: null, ai: null };
   gameStartedAt = Date.now();
   announced = { player: new Set(), ai: new Set(), both: new Set() };
+  planDone = new Set();
   clearStrategyBanner();
+  clearSpeech();
   setMood('even');
   renderKifu();
   renderLastMoves();
@@ -409,6 +464,7 @@ function resetGame() {
     [ null, {k:'KA',o:'player'}, null, null, null, null, null, {k:'HI',o:'player'}, null ],
     [ {k:'KY',o:'player'}, {k:'KE',o:'player'}, {k:'GI',o:'player'}, {k:'KI',o:'player'}, {k:'OU',o:'player'}, {k:'KI',o:'player'}, {k:'GI',o:'player'}, {k:'KE',o:'player'}, {k:'KY',o:'player'} ]
   ];
+  tagHomes();
 
   document.getElementById('status').textContent = 'あなたの番です';
   document.getElementById('status').style.color = '#d32f2f';
@@ -650,16 +706,19 @@ function handlePromoteChoice(promote) {
 
 function executeMove(fr, fc, tr, tc, promote) {
   const target = board[tr][tc];
-  
+  let captured = null;
+
   if (target) {
     let rawKind = target.k;
     const unpromote = { TO:'FU', NY:'KY', NK:'KE', NG:'GI', UM:'KA', RY:'HI' };
     if (unpromote[rawKind]) rawKind = unpromote[rawKind];
     hands[turn].push(rawKind);
+    captured = rawKind;
   }
 
   const p = board[fr][fc];
   recordMove(turn, p.k, fr, fc, tr, tc, promote, false);
+  lastAction.captured = captured;
   if (promote) {
     const promMap = { FU:'TO', KY:'NY', KE:'NK', GI:'NG', KA:'UM', HI:'RY' };
     p.k = promMap[p.k] || p.k;
@@ -691,10 +750,11 @@ function finishPlayerTurn() {
   }
 
   turn = 'ai';
-  document.getElementById('status').textContent = '相手（AI）が考えています...';
+  document.getElementById('status').textContent = opponent.name + 'が考えています...';
   const gaveCheck = isInCheck('ai');
   if (gaveCheck) showCheck();
-  announceStrategies(gaveCheck ? 1500 : 0);
+  const found = announceStrategies(gaveCheck ? 1500 : 0);
+  speakAfterMove('player', found, gaveCheck);
   setTimeout(aiTurn, gaveCheck ? 1300 : 200);
 }
 
@@ -715,14 +775,12 @@ function endGame(message, playerWon = false) {
   selected = null;
   movable = [];
   render();
-  saveGame(playerWon);
   setMood(playerWon ? 'win' : 'lose');
+  say(playerWon ? 'aiLose' : 'aiWin');
   if (playerWon) openNameModal();
 }
 
 // ---- 棋譜 ----
-const KIFU_STORE_KEY = 'rakushogi-kifu';
-const KIFU_STORE_MAX = 20;
 const FILE_CHARS = ['１','２','３','４','５','６','７','８','９'];
 const RANK_CHARS = ['一','二','三','四','五','六','七','八','九'];
 const KIF_NAMES = { FU:'歩', KY:'香', KE:'桂', GI:'銀', KI:'金', KA:'角', HI:'飛', OU:'玉',
@@ -742,6 +800,7 @@ function recordMove(side, kind, fr, fc, tr, tc, promote, isDrop) {
   const origin = isDrop ? '打' : '(' + squareKif(fr, fc) + ')';
   const kif = sq + name + origin;
   kifu.push({ n: kifu.length + 1, side, text, kif, tr, tc });
+  lastAction = { side, captured: null, promoted: !!promote };
   moveCount = kifu.length;
   updateMoveCount();
 
@@ -803,7 +862,7 @@ function buildKif(game) {
     '終了日時：' + formatDateTime(game.endedAt),
     '手合割：平手',
     '先手：' + name,
-    '後手：らくらく将棋AI',
+    '後手：' + (game.opponent || 'らくらく将棋AI'),
     '手数----指手---------消費時間--'
   ];
   game.moves.forEach((m, i) => lines.push(String(i + 1).padStart(4, ' ') + ' ' + m.kif + '   ( 0:00/00:00:00)'));
@@ -821,49 +880,7 @@ function buildKif(game) {
 }
 
 function currentGame(result) {
-  return { startedAt: gameStartedAt, endedAt: Date.now(), result, moves: kifu.map(m => ({ kif: m.kif, text: m.text })) };
-}
-
-function loadSavedGames() {
-  try {
-    const list = JSON.parse(localStorage.getItem(KIFU_STORE_KEY) || '[]');
-    return Array.isArray(list) ? list : [];
-  } catch (e) { return []; }
-}
-
-// 終局した対局をこの端末に保存する（新しい順に20局まで）
-function saveGame(playerWon) {
-  if (kifu.length === 0) return;
-  const list = loadSavedGames();
-  list.unshift(currentGame(playerWon ? 'win' : 'lose'));
-  try { localStorage.setItem(KIFU_STORE_KEY, JSON.stringify(list.slice(0, KIFU_STORE_MAX))); } catch (e) {}
-  renderSavedGames();
-}
-
-function renderSavedGames() {
-  const el = document.getElementById('saved-list');
-  el.innerHTML = '';
-  const list = loadSavedGames();
-  if (list.length === 0) {
-    const li = document.createElement('li');
-    li.className = 'empty';
-    li.textContent = '対局が終わると、ここに棋譜が残ります。';
-    el.appendChild(li);
-    return;
-  }
-  list.forEach((g, i) => {
-    const li = document.createElement('li');
-    const date = document.createElement('span'); date.className = 'date';
-    date.textContent = formatDateTime(g.endedAt).slice(0, 16) + '　' + g.moves.length + '手';
-    const res = document.createElement('span'); res.className = g.result;
-    res.textContent = g.result === 'win' ? '勝ち' : '負け';
-    const copy = document.createElement('button'); copy.className = 'small-btn'; copy.textContent = 'コピー';
-    copy.onclick = () => copyText(buildKif(g));
-    const dl = document.createElement('button'); dl.className = 'small-btn'; dl.textContent = 'DL';
-    dl.onclick = () => downloadText(buildKif(g), g.endedAt);
-    li.appendChild(date); li.appendChild(res); li.appendChild(copy); li.appendChild(dl);
-    el.appendChild(li);
-  });
+  return { startedAt: gameStartedAt, endedAt: Date.now(), result, moves: kifu.map(m => ({ kif: m.kif, text: m.text })), opponent: opponent.name };
 }
 
 function showPanelMessage(text) {
@@ -910,30 +927,53 @@ function updateMoveCount() {
   document.getElementById('move-count').textContent = moveCount + '手';
 }
 
-// ランキングはみんなで共有するため、Cloudflare Workers 上のAPIに読み書きする
-async function loadRanking() {
+// ランキングはみんなで共有するため、Cloudflare Workers 上のAPIに読み書きする。相手ごとに別のランキング
+let rankingOpponent = null; // ランキング欄で開いている相手
+let winOpponent = null;     // 勝ったときの相手（名前の登録が終わるまで覚えておく）
+
+function showRankingTab(o) {
+  rankingOpponent = o;
+  document.getElementById('ranking-title').textContent = o.name + 'に少ない手数で勝った順';
+  const tabs = document.getElementById('rank-tabs');
+  tabs.innerHTML = '';
+  OPPONENTS.forEach(x => {
+    const b = document.createElement('button');
+    b.className = 'rank-tab' + (x.id === o.id ? ' active' : '');
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', x.id === o.id);
+    b.textContent = x.name;
+    b.onclick = () => loadRanking(x);
+    tabs.appendChild(b);
+  });
+}
+
+async function loadRanking(o) {
+  showRankingTab(o);
   renderRankingMessage('読み込み中...');
   try {
-    const res = await fetch(RANKING_API, { cache: 'no-store' });
+    const res = await fetch(RANKING_API + '?opponent=' + o.id, { cache: 'no-store' });
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
-    renderRanking(data.ranking || []);
+    if (rankingOpponent === o) renderRanking(data.ranking || []); // 途中で別のタブに切り替えたら捨てる
   } catch (e) {
-    renderRankingMessage('ランキングを読み込めませんでした。通信状態を確認して、ページを開き直してください。');
+    if (rankingOpponent === o) renderRankingMessage('ランキングを読み込めませんでした。通信状態を確認して、ページを開き直してください。');
   }
 }
 
 async function saveRecord(name) {
   try { localStorage.setItem(LAST_NAME_KEY, name); } catch (e) {}
+  const o = winOpponent;
+  showRankingTab(o);
   renderRankingMessage('登録中...');
   try {
     const res = await fetch(RANKING_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, moves: moveCount })
+      body: JSON.stringify({ name, moves: moveCount, opponent: o.id })
     });
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
+    showRankingTab(o);
     renderRanking(data.ranking || []);
     const statusEl = document.getElementById('status');
     statusEl.textContent = data.rank ? `${data.rank}位に登録しました！ 🎉` : '登録しました（上位10件には入りませんでした）';
@@ -959,7 +999,7 @@ function formatDate(ts) {
 
 function renderRanking(list) {
   if (list.length === 0) {
-    renderRankingMessage('まだ記録がありません。AIに勝つと登録できます。');
+    renderRankingMessage('まだ記録がありません。' + rankingOpponent.name + 'に勝つと登録できます。');
     return;
   }
   const el = document.getElementById('ranking');
@@ -976,6 +1016,7 @@ function renderRanking(list) {
 }
 
 function openNameModal() {
+  winOpponent = opponent;
   document.getElementById('name-modal-msg').textContent = moveCount + '手で勝ちました！';
   const input = document.getElementById('name-input');
   let last = '';
@@ -1092,23 +1133,17 @@ function aiTurn() {
     return;
   }
 
-  let bestScore = -Infinity;
-  let bestMoves = [];
-
-  // アルファベータ法でベストな手を判定（深さ3手探索）
-  for (const m of allMoves) {
+  // アルファベータ法で全ての手に点数を付ける（深さ3手探索）
+  const scored = allMoves.map(m => {
     const { tempB, tempH } = applyMove(board, hands, m, 'ai');
-    const score = minimax(tempB, tempH, 2, -Infinity, Infinity, false);
+    return { m, score: minimax(tempB, tempH, 2, -Infinity, Infinity, false) };
+  });
+  const bestScore = Math.max(...scored.map(x => x.score));
+  const bestMoves = scored.filter(x => x.score === bestScore).map(x => x.m);
 
-    if (score > bestScore) {
-      bestScore = score;
-      bestMoves = [m];
-    } else if (score === bestScore) {
-      bestMoves.push(m);
-    }
-  }
-
-  const chosen = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+  // 序盤は、最善とほぼ同じ点数の手の中から得意戦法の形に近づく手を選ぶ
+  const nearBest = scored.filter(x => x.score >= bestScore - PLAN_MARGIN).map(x => x.m);
+  const chosen = pickOpeningMove(nearBest) || bestMoves[Math.floor(Math.random() * bestMoves.length)];
 
   if (chosen.type === 'move') {
     const canPromote = (chosen.tr >= 6 || chosen.fr >= 6) && ['FU','KY','KE','GI','KA','HI'].includes(board[chosen.fr][chosen.fc].k);
@@ -1143,7 +1178,8 @@ function aiTurn() {
   } else {
     document.getElementById('status').textContent = 'あなたの番です';
   }
-  announceStrategies(inCheck ? 1500 : 0);
+  const found = announceStrategies(inCheck ? 1500 : 0);
+  speakAfterMove('ai', found, inCheck);
   updateMood();
 }
 
@@ -1197,6 +1233,298 @@ function toggleFx() {
   try { localStorage.setItem(FX_KEY, fxOff() ? 'on' : 'off'); } catch (e) {}
   applyFxSetting();
   setMood(document.body.dataset.mood || 'even');
+}
+
+// ---- 対戦相手と得意戦法の序盤 ----
+// 手順の各項目は「最初に home にいた駒を to へ」。座標はすべて相手（AI）から見た筋・段で書く
+const OPPONENT_KEY = 'rakushogi-opponent';
+const OPENING_PLAN_MOVES = 40; // この手数までは手順に沿って駒を組む
+const PLAN_MARGIN = 60;        // 最善の手からこの点数差までなら、形を優先する（歩1枚は100点）
+const step = (home, file, rank) => ({ home, to: [file, rank] });
+
+const OPPONENTS = [
+  { id: 'ginji', name: '銀次', style: '棒銀・舟囲い',
+    intro: '居飛車で、銀を前に出してまっすぐ攻めてきます。',
+    plan: [step('77', 7, 6), step('27', 2, 6), step('49', 5, 8), step('59', 6, 8), step('59', 7, 8),
+           step('27', 2, 5), step('39', 3, 8), step('39', 2, 7), step('39', 2, 6), step('27', 2, 4)] },
+  { id: 'omino', name: 'お美濃', style: '四間飛車・美濃囲い',
+    intro: '玉をしっかり囲ってから、こちらの攻めを受け止めて反撃してきます。',
+    plan: [step('77', 7, 6), step('67', 6, 6), step('28', 6, 8), step('59', 4, 8), step('59', 3, 8),
+           step('59', 2, 8), step('39', 3, 8), step('69', 5, 8), step('17', 1, 6)] },
+  { id: 'nakata', name: '中太', style: '中飛車・美濃囲い',
+    intro: '飛車を真ん中に構えて、5筋から力強く攻めてきます。',
+    plan: [step('57', 5, 6), step('77', 7, 6), step('28', 5, 8), step('59', 4, 8), step('59', 3, 8),
+           step('59', 2, 8), step('39', 3, 8), step('57', 5, 5), step('79', 6, 8)] },
+];
+
+function aiView(r, c) { return { file: c + 1, rank: 9 - r }; }
+
+// AIの駒に最初の位置を書いておく。駒は executeMove でオブジェクトごと動くので印も一緒に動く
+function tagHomes() {
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    const p = board[r][c];
+    if (p && p.o === 'ai') { const v = aiView(r, c); p.home = '' + v.file + v.rank; }
+  }
+}
+
+function findHome(home) {
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    const p = board[r][c];
+    if (p && p.o === 'ai' && p.home === home) return { r, c, ...aiView(r, c) };
+  }
+  return null; // 取られた駒
+}
+
+// 候補の手から、手順のまだ済んでいない項目に近づく手を1つ選ぶ。使える手がなければ null
+function pickOpeningMove(candidates) {
+  if (!opponent || kifu.length > OPENING_PLAN_MOVES) return null;
+  const plan = opponent.plan;
+
+  // 目標に着いた項目と、同じ駒のそれより前の項目を済みにする
+  plan.forEach((s, i) => {
+    const at = findHome(s.home);
+    if (!at || at.file !== s.to[0] || at.rank !== s.to[1]) return;
+    for (let j = 0; j <= i; j++) if (plan[j].home === s.home) planDone.add(j);
+  });
+
+  // 手順をすべて終えた駒は、組んだ形を崩さないよう動かさない
+  const finished = home => plan.every((s, i) => s.home !== home || planDone.has(i));
+  const usable = candidates.filter(m => m.type === 'move' && !(board[m.fr][m.fc].home && finished(board[m.fr][m.fc].home)));
+
+  for (let i = 0; i < plan.length; i++) {
+    if (planDone.has(i)) continue;
+    const s = plan[i];
+    const at = findHome(s.home);
+    if (!at) continue;
+    const dist = v => Math.max(Math.abs(v.file - s.to[0]), Math.abs(v.rank - s.to[1]));
+    let best = null, bestDist = dist(at);
+    for (const m of usable) {
+      if (m.fr !== at.r || m.fc !== at.c) continue;
+      const d = dist(aiView(m.tr, m.tc));
+      if (d < bestDist) { bestDist = d; best = m; }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+function loadOpponent() {
+  let id = null;
+  try { id = localStorage.getItem(OPPONENT_KEY); } catch (e) {}
+  return OPPONENTS.find(o => o.id === id) || null;
+}
+
+function applyOpponentLabels() {
+  document.getElementById('ai-hand-title').textContent = opponent.name + 'の持ち駒:';
+  document.getElementById('ai-label').textContent = opponent.name;
+}
+
+// 相手を選ぶ画面。対局の途中で開いたときだけ「やめる」で戻れる
+function openOpponentModal(cancelable) {
+  const list = document.getElementById('opponent-list');
+  list.innerHTML = '';
+  const last = loadOpponent();
+  OPPONENTS.forEach(o => {
+    const card = document.createElement('button');
+    card.className = 'opp-card' + (last && last.id === o.id ? ' current' : '');
+    card.innerHTML = '<span class="opp-name"></span><span class="opp-style"></span><div class="opp-intro"></div>';
+    card.querySelector('.opp-name').textContent = o.name;
+    card.querySelector('.opp-style').textContent = o.style;
+    card.querySelector('.opp-intro').textContent = o.intro;
+    card.onclick = () => startGame(o);
+    list.appendChild(card);
+  });
+  document.getElementById('opponent-cancel').style.display = cancelable ? 'inline-block' : 'none';
+  document.getElementById('opponent-modal').style.display = 'flex';
+}
+
+function closeOpponentModal() { document.getElementById('opponent-modal').style.display = 'none'; }
+
+function startGame(o) {
+  opponent = o;
+  try { localStorage.setItem(OPPONENT_KEY, o.id); } catch (e) {}
+  applyOpponentLabels();
+  closeOpponentModal();
+  resetGame();
+  if (rankingOpponent !== o) loadRanking(o);
+  say('start');
+}
+
+// ---- 相手のセリフ ----
+// 場面ごとに候補を持ち、最近使ったものを避けてランダムに選ぶ。{p} は駒の名前、{s} は戦法の名前に置きかえる
+const SPEECH = {
+  ginji: {
+    start: ['さあ、いっちょ揉んでやるぜ！', '棒銀一本で生きてきた男だ。覚悟しな！', '手加減はしねえからな、いくぜ！',
+      'おう、よろしく頼むぜ。楽しい一局にしようや。', '今日も銀がうずいてやがる……！', '先に言っとく。おいらは攻めるぜ！'],
+    idle: ['さて、どう攻めてやろうか。', '銀を前へ、前へ。それが粋ってもんよ。', 'ふむ、なかなか手堅いじゃねえか。',
+      'へっへっへ、そろそろ仕掛けどきかな。', '守ってばかりじゃ将棋はつまらねえぜ？', '次の一手、楽しみにしときな。',
+      '考えるより先に手が出ちまうんだよな。', 'おいらの銀、どこまで行けるかな。', 'ほう、そうくるかい。', 'まだまだ序の口よ。'],
+    giveCheck: ['王手だ！どうする、どうする？', 'ほらほら、王様が危ないぜ！', '王手！逃げるなら今のうちだ！',
+      'つかまえたぜ、王手！', 'いくぜ、王手っ！', '王様、ちょいと顔を貸してもらおうか！'],
+    checked: ['おっと、王手かい！やるじゃねえか。', 'くっ、そこからきやがったか！', 'ひゃー、肝が冷えたぜ。',
+      '王手とは生意気な！……でも、いい手だ。', '慌てるな、慌てるなよ、おいら。', 'ちっ、油断しちまったぜ。'],
+    tookBig: ['{p}、いただきだ！', 'へへっ、{p}はもらったぜ！', '{p}を取ったぜ。こいつは大きいぞ！',
+      'ごちそうさん！{p}はありがたく使わせてもらうぜ。', '{p}ゲットだ！攻めが楽しくなってきた！', '油断大敵ってやつよ。{p}、もらい！'],
+    tookSmall: ['{p}一枚、もらっとくぜ。', '小さな得も積もれば山ってな。', 'ちょいとつまませてもらったぜ。',
+      '{p}だって立派な戦力よ。', 'へへ、拾いものだ。', 'いただき！'],
+    lostBig: ['げっ、{p}を取られた！', 'やるな！{p}はでかいぜ……。', 'ちくしょう、{p}をもってかれた！',
+      'くーっ、{p}が……！こいつは痛え。', 'やられた！見事な手だぜ。', '{p}を取るとは、おめえ、うまいな！'],
+    lostSmall: ['{p}くらいくれてやらあ。', 'ちっ、{p}を取られたか。', 'まあ、{p}一枚ならどうってことねえ。',
+      'こまけえことは気にしねえ！', 'うっ、地味に効くな……。', 'しっかり取ってくるねえ。'],
+    aiPromoted: ['成ったぜ！ここからが本番よ！', 'へっへっ、出世したぜ！', '成り込み成功！暴れさせてもらうぜ。',
+      '敵陣で大暴れだ！', 'パワーアップだ！覚悟しな！', '成りの一手、決まったぜ！'],
+    playerPromoted: ['うおっ、成り込まれた！', 'そいつに暴れられると厄介だぜ……。', 'やるな！そこで成るか。',
+      'ちっ、陣地に入られちまった。', 'くっ、こいつは止めねえと。', '成られたか……油断したぜ。'],
+    myStrategy: ['決まった！これが{s}よ！', '見たか、{s}の形だ！', '{s}、完成だ！ここから攻めるぜ！',
+      'おいらの{s}、受けてみな！', 'へっへっへ、{s}の出来上がりだ。', '{s}が組めりゃこっちのもんよ！'],
+    playerStrategy: ['ほう、{s}か。いい度胸だ！', '{s}とはな。おめえ、分かってるじゃねえか。', '{s}かい！面白くなってきたぜ。',
+      'なるほど、{s}できたか。', '{s}だと？受けて立つぜ！', 'おっ、{s}だな。腕が鳴るぜ！'],
+    winning: ['へへ、流れはこっちにきてるぜ！', 'いい調子だ、このまま押し切るぜ！', 'おいらのペースだな。',
+      'ほらほら、どうした？', '勢いってやつは止まらねえぜ！', 'こいつはもらったかな？いやいや、油断禁物だ。'],
+    losing: ['むむ、ちょいと押されてるな……。', 'やるな！おめえ、うまいじゃねえか。', 'くっ、まだまだこれからよ！',
+      '苦しいときこそ前へ出るのが江戸っ子よ！', 'こりゃまいった……いや、まだ負けてねえ！', 'しぶといねえ、おめえさん。'],
+    aiWin: ['へへっ、おいらの勝ちだ！また来な！', '棒銀の勝利だぜ！いい勝負だった！', '勝負あり！次はもっと粘ってみな。',
+      'ありがとよ！楽しかったぜ。', '銀は裏切らねえってことよ！', 'また揉んでやるぜ、いつでも来な！'],
+    aiLose: ['まいった！おめえ、強えな！', 'くーっ、負けた！完敗だぜ。', '見事だ！次は負けねえからな！',
+      'やられたぜ……いい将棋だった。', 'ちくしょう、覚えてやがれ！……なんてな。ありがとよ！', 'おめえ、うまいね！おいらの完敗だ。'],
+  },
+  omino: {
+    start: ['よろしくお願いいたします。ゆっくり楽しみましょうね。', 'まずは玉をしっかり囲いましょうか。', 'お手柔らかにお願いしますね。',
+      '美濃囲いの堅さ、お見せいたします。', '焦らず参りましょう。', 'さあ、どこからでもいらしてください。'],
+    idle: ['ふふ、どういたしましょう。', '守りは将棋の基本ですわ。', '落ち着いて、落ち着いて。',
+      'あなたの狙い、見えておりますよ。', '玉の周りは整っておりますか？', '急がば回れ、と申しますでしょう？',
+      'お茶でも飲みながら考えたい局面ですね。', 'さて、次はどこを固めましょう。', 'いい手を探していらっしゃるのね。', 'じっくり参りましょう。'],
+    giveCheck: ['王手でございます。', '失礼して、王手ですわ。', 'あら、王様がお留守のようですね。',
+      '王手です。お逃げになって。', 'ふふ、捕まえましたよ。', 'ここで王手、いかがでしょう。'],
+    checked: ['あら、王手ですか。', 'まあ、そこから来ましたか。', 'なかなか鋭いですね。',
+      '落ち着いて受けますわ。', 'ひやりといたしました。', 'いい王手ですこと。'],
+    tookBig: ['{p}、頂戴いたしますね。', 'あら、{p}をいただけるなんて。', '{p}、ありがたく使わせていただきます。',
+      'ふふ、{p}を手に入れましたわ。', '受けてからの反撃、これが私の流儀です。', '{p}をいただきました。形勢が変わりそうですね。'],
+    tookSmall: ['{p}を一枚いただきます。', '小さな得も大切ですわ。', 'ふふ、拾わせていただきました。',
+      '{p}も立派な戦力ですから。', 'ありがたく頂戴します。', 'こういう一枚が後で効いてくるのです。'],
+    lostBig: ['まあ、{p}を取られてしまいました。', 'やりますね……{p}は痛いですわ。', 'あら、私としたことが。',
+      'お見事です。{p}を持っていかれるとは。', '{p}が……悔しいですね。', 'あなた、お上手ですね。'],
+    lostSmall: ['{p}くらいなら差し上げますわ。', 'あら、{p}を取られました。', 'その程度で囲いは崩れませんよ。',
+      'ふふ、小さなことです。', 'しっかり取っていかれますね。', 'まあ、仕方ありませんね。'],
+    aiPromoted: ['成らせていただきます。', 'ふふ、成りましたわ。', 'ここからは私の番ですね。',
+      '守りの後は、攻めに転じますわ。', 'お邪魔いたしますね。', '敵陣にお邪魔しました。'],
+    playerPromoted: ['まあ、成られてしまいました。', '入られてしまいましたね。', 'あら、困りましたわ。',
+      '落ち着いて対処いたします。', 'なかなか大胆ですこと。', 'そこで成りますか。お見事です。'],
+    myStrategy: ['{s}、整いました。', 'ふふ、{s}の出来上がりです。', '{s}が組めましたわ。さあ、いらして。',
+      'これが私の{s}です。', '{s}、堅いですわよ。', '{s}が完成しました。安心いたしました。'],
+    playerStrategy: ['あら、{s}ですね。', '{s}でいらっしゃいますか。お手並み拝見です。', 'まあ、{s}。よくご存じですね。',
+      '{s}、素敵な選択ですわ。', '{s}ですか。受けて立ちましょう。', 'なるほど、{s}でまいりましたか。'],
+    winning: ['ふふ、少しずつ良くなってまいりました。', 'いい流れですわ。', 'このまま丁寧に参りましょう。',
+      '守りが活きてまいりましたね。', '焦らず、確実に。', 'どうやら私の形勢のようですね。'],
+    losing: ['あら、少し押されておりますね。', 'やりますね……君、うまいわね。', 'まだ囲いは崩れておりませんよ。',
+      '困りましたわ。', 'ここが辛抱のしどころです。', 'さすがですね。気を引き締めます。'],
+    aiWin: ['ありがとうございました。私の勝ちですね。', 'いい勝負でしたわ。またお越しください。', '守り勝ちです。ふふ。',
+      'お疲れさまでした。次も楽しみにしておりますね。', '堅さが勝ちましたわ。', 'またいつでもお相手いたします。'],
+    aiLose: ['負けました。お見事でした。', 'まあ……完敗ですわ。お強いですね。', 'ありがとうございました。勉強になりました。',
+      '悔しいですが、素晴らしい将棋でした。', 'あなた、本当にお上手ですね。', '次は負けませんよ。ふふ。'],
+  },
+  nakata: {
+    start: ['押忍！よろしくお願いしまっす！', 'ど真ん中から行くっす！', '全力でいくっす！',
+      '中飛車一筋っす！覚悟してくださいっす！', '今日も気合十分っす！', 'いい汗かきましょうっす！'],
+    idle: ['うーん、考え中っす！', '真ん中が一番っす！', '次はどこ攻めるっすかね。',
+      '気合っす、気合！', '5筋は譲らないっす！', 'いい感じっすね！',
+      'ちょっと深呼吸するっす。', '攻めて攻めて攻めまくるっす！', 'じっとしてるのは苦手っす。', 'さあ、勝負っす！'],
+    giveCheck: ['王手っす！', 'いったっす、王手！', '王様、逃げてくださいっす！',
+      'どーん！王手っす！', '真ん中から王手っす！', 'つかまえたっす！'],
+    checked: ['うわっ、王手っす！', 'やばいっす、やばいっす！', 'そこから来るっすか！',
+      'ひえー、びっくりしたっす！', 'まだまだ負けないっす！', '効いたっす……！'],
+    tookBig: ['{p}もらったっす！', 'やったっす！{p}ゲットっす！', '{p}、ありがたく使うっす！',
+      'よっしゃー！{p}っす！', '{p}取れたっす！大きいっす！', 'ナイスっす、おれ！'],
+    tookSmall: ['{p}もらうっす！', 'ちょっとだけ得したっす！', '{p}だって大事っす！',
+      'いただきっす！', 'コツコツいくっす！', '拾ったっす！'],
+    lostBig: ['うわー、{p}取られたっす！', 'やるっすね！{p}は痛いっす！', 'マジっすか……{p}が……！',
+      'くやしいっす！', 'すごいっす、うまいっすね！', '{p}を取られるとは……油断したっす！'],
+    lostSmall: ['{p}くらい平気っす！', 'あっ、{p}取られたっす。', '大丈夫っす、まだいけるっす！',
+      '気にしないっす！', 'ちょっと痛いっす。', 'しっかりしてるっすね！'],
+    aiPromoted: ['成ったっす！パワーアップっす！', '敵陣突入っす！', 'ここから大暴れっす！',
+      '成りっす！最高っす！', '強くなったっす！', 'いっくっすよー！'],
+    playerPromoted: ['うわっ、成られたっす！', '入られちゃったっす……。', '強そうっす……！',
+      '止めないとまずいっす！', 'やるっすね！', 'くっ、そう来たっすか！'],
+    myStrategy: ['{s}、完成っす！', '見てくださいっす、{s}っす！', '{s}が決まったっす！',
+      'これがおれの{s}っす！', '{s}で押し切るっす！', 'よっしゃ、{s}っす！'],
+    playerStrategy: ['{s}っすか！かっこいいっす！', 'おっ、{s}っすね！', '{s}、負けないっすよ！',
+      '{s}とは渋いっす！', '{s}っすか、燃えてきたっす！', 'すごいっす、{s}っす！'],
+    winning: ['いい感じっす！このままいくっす！', '流れが来てるっす！', '押せ押せっす！',
+      '勝ちが見えてきたっす……いや、油断禁物っす！', '真ん中が効いてるっす！', '最高っす！'],
+    losing: ['ちょっと苦しいっす……。', 'うまいっすね！', 'まだまだ諦めないっす！',
+      'ここから逆転するっす！', 'ピンチっす……でも燃えるっす！', 'やるっすね、本気出すっす！'],
+    aiWin: ['勝ったっす！ありがとうございましたっす！', '押忍！いい勝負だったっす！', 'ど真ん中の勝利っす！',
+      'またやりましょうっす！', '楽しかったっす！', '次も負けないっすよ！'],
+    aiLose: ['負けたっす……！強いっす！', '完敗っす！ありがとうございましたっす！', 'くやしいっす！次は勝つっす！',
+      'すごいっす、うまいっすね！', '修行して出直すっす！', '押忍……参りましたっす！'],
+  },
+};
+
+// 表示中のセリフより優先度が低いものは出さない（相手の手のすぐあとに大事なセリフが消えないように）
+const SPEECH_PRIORITY = {
+  aiWin: 9, aiLose: 9, giveCheck: 7, checked: 7, tookBig: 6, lostBig: 6, aiPromoted: 5, playerPromoted: 5,
+  myStrategy: 4, playerStrategy: 4, tookSmall: 3, lostSmall: 3, start: 2, winning: 2, losing: 2, idle: 0,
+};
+const PIECE_SPEECH = { FU: '歩', KY: '香車', KE: '桂馬', GI: '銀', KI: '金', KA: '角', HI: '飛車', OU: '玉' };
+const BIG_PIECES = ['HI', 'KA', 'KI', 'GI'];
+let recentSpeech = [];
+let speechShowing = null; // { priority, until }
+let speechTimer = null;
+let speechLevel = 0;      // 形勢の段階（あなた視点）。変わったときだけ「良くなった」「悪くなった」を言う
+
+function say(event, vars = {}) {
+  const lines = SPEECH[opponent.id][event];
+  const priority = SPEECH_PRIORITY[event];
+  if (speechShowing && Date.now() < speechShowing.until && priority < speechShowing.priority) return;
+  const fresh = lines.filter(l => !recentSpeech.includes(l));
+  const line = (fresh.length ? fresh : lines)[Math.floor(Math.random() * (fresh.length || lines.length))];
+  recentSpeech = [line, ...recentSpeech].slice(0, 5);
+  const text = line.replace('{p}', vars.p || '').replace('{s}', vars.s || '');
+
+  const el = document.getElementById('speech');
+  el.querySelector('.sp-name').textContent = opponent.name;
+  el.querySelector('.sp-text').textContent = text;
+  el.classList.add('show');
+  const ms = Math.min(5000, Math.max(3000, 1800 + text.length * 120));
+  speechShowing = { priority, until: Date.now() + ms };
+  clearTimeout(speechTimer);
+  speechTimer = setTimeout(() => { el.classList.remove('show'); speechShowing = null; }, ms);
+}
+
+function clearSpeech() {
+  clearTimeout(speechTimer);
+  speechShowing = null;
+  speechLevel = 0;
+  const el = document.getElementById('speech');
+  if (el) el.classList.remove('show');
+}
+
+// あなた視点の点数を5段階にする（judgeMood と違い、王手かどうかは含めない）
+function currentSpeechLevel() {
+  const score = -evaluateBoard(board, hands);
+  if (score >= 1500) return 2;
+  if (score >= 600) return 1;
+  if (score > -600) return 0;
+  if (score > -1500) return -1;
+  return -2;
+}
+
+// 1手指したあとに、いちばん大事な場面を1つ選んでしゃべる
+function speakAfterMove(side, found, check) {
+  const mine = side === 'ai';
+  const cap = lastAction.side === side ? lastAction.captured : null;
+  const strategy = found.find(f => f.side === side);
+  const level = currentSpeechLevel();
+  const levelChanged = level !== speechLevel;
+  const levelUp = level > speechLevel; // あなたにとって良くなった
+  speechLevel = level;
+
+  if (check) return say(mine ? 'giveCheck' : 'checked');
+  if (cap) return say((mine ? 'took' : 'lost') + (BIG_PIECES.includes(cap) ? 'Big' : 'Small'), { p: PIECE_SPEECH[cap] });
+  if (lastAction.side === side && lastAction.promoted) return say(mine ? 'aiPromoted' : 'playerPromoted');
+  if (strategy) return say(mine ? 'myStrategy' : 'playerStrategy', { s: strategy.name });
+  if (levelChanged) return say(levelUp ? 'losing' : 'winning');
+  if (mine && Math.random() < 1 / 3) say('idle');
 }
 
 // ---- 戦法・囲いの判定と表示 ----
@@ -1302,7 +1630,7 @@ function announceStrategies(delay) {
     for (const s of STRATEGIES) {
       if (announced[side].has(s.id) || !s.test(v)) continue;
       announced[side].add(s.id);
-      found.push({ side, label: (side === 'player' ? 'あなたの' : '相手の') + s.type, name: s.name, aim: s.aim });
+      found.push({ side, label: (side === 'player' ? 'あなた' : opponent.name) + 'の' + s.type, name: s.name, aim: s.aim });
     }
   }
   for (const m of MATCHUPS) {
@@ -1310,15 +1638,19 @@ function announceStrategies(delay) {
     announced.both.add(m.id);
     found.push({ side: 'both', label: '戦型', name: m.name, aim: m.aim });
   }
-  if (found.length === 0) return;
+  if (found.length === 0) return found;
 
   const last = kifu[kifu.length - 1];
   if (last) { last.tags = (last.tags || []).concat(found.map(f => f.name)); renderKifu(); }
+  strategyLog.push(...found);
+  renderStrategyNote(found[found.length - 1]);
   strategyQueue.push(...found);
   if (!strategyPlaying) { strategyPlaying = true; strategyTimer = setTimeout(playNextStrategy, delay); }
+  return found;
 }
 
-const STRATEGY_MS = 4200;
+const STRATEGY_MS = 1800; // 盤の上に名前を出しておく時間
+let strategyLog = [];      // この対局でできた戦法（戦法メモに並べる）
 let strategyQueue = [];
 let strategyPlaying = false;
 let strategyTimer = null;
@@ -1331,17 +1663,21 @@ function playNextStrategy() {
   if (!item) { strategyPlaying = false; return; }
 
   el.className = item.side;
-  el.style.setProperty('--st-ms', STRATEGY_MS + 'ms');
   el.querySelector('.st-label').textContent = item.label;
   const nameEl = el.querySelector('.st-name');
   nameEl.textContent = item.name;
   // 名前の長さに合わせて、盤の幅に収まる大きさにする
-  nameEl.style.fontSize = 'calc(var(--board-size) * ' + Math.min(0.17, 0.8 / item.name.length) + ')';
-  el.querySelector('.st-aim').textContent = item.aim;
+  nameEl.style.fontSize = 'calc(var(--board-size) * ' + Math.min(0.12, 0.8 / item.name.length) + ')';
   void el.offsetWidth; // 続けて表示するときも毎回アニメーションが最初から再生されるようにする
   el.classList.add('show');
   strategyShownAt = Date.now();
-  strategyTimer = setTimeout(playNextStrategy, STRATEGY_MS);
+  strategyTimer = setTimeout(closeStrategy, STRATEGY_MS);
+}
+
+// 薄く消してから次の戦法へ進む
+function closeStrategy() {
+  document.getElementById('strategy-banner').classList.add('out');
+  strategyTimer = setTimeout(playNextStrategy, 250);
 }
 
 // 表示中に画面を触ったら、早めに閉じて次へ進む
@@ -1350,12 +1686,46 @@ function dismissStrategy() {
   if (!el.classList.contains('show') || el.classList.contains('out')) return;
   if (Date.now() - strategyShownAt < 600) return; // 戦法を成立させた手のタップでは閉じない
   clearTimeout(strategyTimer);
-  el.classList.add('out');
-  strategyTimer = setTimeout(playNextStrategy, 250);
+  closeStrategy();
+}
+
+// 戦法メモを描く。上に選んだ戦法の名前と狙い、下にこの対局でできた戦法を並べ、押すとその説明に切りかわる
+function renderStrategyNote(current) {
+  const el = document.getElementById('strategy-note');
+  el.innerHTML = '';
+  if (!current) {
+    const empty = document.createElement('div');
+    empty.className = 'note-empty';
+    empty.textContent = '戦法や囲いができると、ここに狙いが出ます。';
+    el.appendChild(empty);
+    return;
+  }
+  const box = document.createElement('div');
+  box.className = 'note-current ' + current.side;
+  box.innerHTML = '<div class="note-head"><span class="note-name"></span><span class="note-label"></span></div><div class="note-aim"></div>';
+  box.querySelector('.note-name').textContent = current.name;
+  box.querySelector('.note-label').textContent = current.label;
+  box.querySelector('.note-aim').textContent = current.aim;
+  el.appendChild(box);
+
+  const chips = document.createElement('div');
+  chips.className = 'note-chips';
+  if (strategyLog.length > 1) {
+    strategyLog.forEach(item => {
+      const b = document.createElement('button');
+      b.className = 'note-chip ' + item.side + (item === current ? ' active' : '');
+      b.textContent = item.name;
+      b.onclick = () => renderStrategyNote(item);
+      chips.appendChild(b);
+    });
+  }
+  el.appendChild(chips);
 }
 
 function clearStrategyBanner() {
   clearTimeout(strategyTimer);
+  strategyLog = [];
+  renderStrategyNote(null);
   strategyQueue = [];
   strategyPlaying = false;
   const el = document.getElementById('strategy-banner');
@@ -1420,10 +1790,12 @@ function render() {
 if (document.fonts && document.fonts.load) document.fonts.load('40px "Yuji Syuku"');
 document.addEventListener('click', dismissStrategy);
 document.getElementById('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleNameSubmit(true); });
-loadRanking();
-renderSavedGames();
 applyFxSetting();
+opponent = loadOpponent() || OPPONENTS[0];
+applyOpponentLabels();
+loadRanking(opponent);
 resetGame();
+openOpponentModal(false);
 </script>
 </body>
 </html>
