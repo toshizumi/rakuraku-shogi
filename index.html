@@ -101,7 +101,8 @@
   }
   .small-btn:disabled { opacity: 0.4; }
   #kifu-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; max-height: 112px; overflow-y: auto; font-size: 14px; color: #222; }
-  #kifu-list li { width: 50%; padding: 2px 0; white-space: nowrap; }
+  #kifu-list li { width: 50%; padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #kifu-list li .tag { margin-left: 4px; font-size: 11px; color: #8b5a2b; }
   #kifu-list li .n { display: inline-block; width: 2.2em; text-align: right; margin-right: 4px; color: #888; }
   #kifu-list li.ai { color: #c62828; }
   #kifu-list .empty, #saved-list .empty { width: 100%; color: #888; padding: 4px 0; }
@@ -154,6 +155,60 @@
     @keyframes brush-check {
       0%, 15% { opacity: 0; } 25%, 75% { opacity: 1; } 100% { opacity: 0; }
     }
+  }
+
+  /* 戦法・囲いが成立したときの表示。墨の帯が走り、名前が浮かび、狙いの説明が続く */
+  #strategy-banner {
+    position: absolute; inset: 0; z-index: 49;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    pointer-events: none; opacity: 0;
+  }
+  #strategy-banner .st-band {
+    position: relative; width: 100%; padding: 10px 0 12px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  #strategy-banner .st-band::before {
+    content: ''; position: absolute; inset: 0; z-index: -1;
+    background: rgba(24, 16, 10, 0.86);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    transform-origin: left center;
+  }
+  #strategy-banner .st-label { font-size: 13px; font-weight: bold; color: #d4af37; letter-spacing: 0.2em; }
+  #strategy-banner .st-name {
+    font-family: "Yuji Syuku", "Hiragino Mincho ProN", serif;
+    line-height: 1.15; color: #fdf6e3; white-space: nowrap; letter-spacing: 0.06em;
+    text-shadow: 0 0 14px rgba(212, 175, 55, 0.75);
+  }
+  #strategy-banner.ai .st-label { color: #ef9a9a; }
+  #strategy-banner.ai .st-name { text-shadow: 0 0 14px rgba(229, 57, 53, 0.7); }
+  #strategy-banner .st-aim {
+    width: 86%; padding: 8px 12px; border: 2px solid #5c3a21; border-radius: 6px;
+    background: rgba(253, 246, 227, 0.96); color: #4a2c11;
+    font-size: 14px; line-height: 1.55; box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+  }
+  #strategy-banner.show { animation: st-life var(--st-ms) linear forwards; }
+  #strategy-banner.show .st-band::before { animation: st-sweep var(--st-ms) ease-out forwards; }
+  #strategy-banner.show .st-name { animation: st-ink var(--st-ms) ease-out forwards; }
+  #strategy-banner.show .st-aim { animation: st-rise var(--st-ms) ease-out forwards; }
+  #strategy-banner.show.out { animation: st-out 0.25s ease-in forwards; }
+  @keyframes st-life  { 0%, 90% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes st-sweep { 0% { transform: scaleX(0); } 8%, 100% { transform: scaleX(1); } }
+  @keyframes st-ink {
+    0%, 5% { opacity: 0; transform: scale(1.25); filter: blur(8px); }
+    16%, 100% { opacity: 1; transform: scale(1); filter: blur(0); }
+  }
+  @keyframes st-rise { 0%, 14% { opacity: 0; transform: translateY(12px); } 24%, 100% { opacity: 1; transform: none; } }
+  @keyframes st-out { from { opacity: 1; } to { opacity: 0; } }
+  /* 演出オフや動きを減らす設定では、動かさずに名前と説明だけを出して消す */
+  body[data-fx="off"] #strategy-banner.show { animation-name: st-plain; }
+  body[data-fx="off"] #strategy-banner.show .st-band::before,
+  body[data-fx="off"] #strategy-banner.show .st-name,
+  body[data-fx="off"] #strategy-banner.show .st-aim { animation: none; }
+  @keyframes st-plain { 0% { opacity: 0; } 4%, 92% { opacity: 1; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    #strategy-banner.show { animation-name: st-plain; }
+    #strategy-banner.show .st-band::before, #strategy-banner.show .st-name, #strategy-banner.show .st-aim { animation: none; }
   }
 
   /* ---- 形勢に応じた雰囲気（盤の外側だけを変え、マスと駒には触れない） ---- */
@@ -250,6 +305,10 @@
 <div id="board-wrap">
   <div id="board"></div>
   <div id="check-banner" aria-live="polite">王手</div>
+  <div id="strategy-banner" aria-live="polite">
+    <div class="st-band"><div class="st-label"></div><div class="st-name"></div></div>
+    <div class="st-aim"></div>
+  </div>
 </div>
 
 <div class="hand-container">
@@ -321,6 +380,7 @@ let moveCount = 0;
 let kifu = [];                          // 今の対局の指し手
 let lastMoves = { player: null, ai: null }; // 双方の最後の一手（盤上の印と表示に使う）
 let gameStartedAt = 0;
+let announced = { player: new Set(), ai: new Set(), both: new Set() }; // この対局で表示済みの戦法
 
 function resetGame() {
   turn = "player";
@@ -332,6 +392,8 @@ function resetGame() {
   kifu = [];
   lastMoves = { player: null, ai: null };
   gameStartedAt = Date.now();
+  announced = { player: new Set(), ai: new Set(), both: new Set() };
+  clearStrategyBanner();
   setMood('even');
   renderKifu();
   renderLastMoves();
@@ -632,6 +694,7 @@ function finishPlayerTurn() {
   document.getElementById('status').textContent = '相手（AI）が考えています...';
   const gaveCheck = isInCheck('ai');
   if (gaveCheck) showCheck();
+  announceStrategies(gaveCheck ? 1500 : 0);
   setTimeout(aiTurn, gaveCheck ? 1300 : 200);
 }
 
@@ -711,6 +774,10 @@ function renderKifu() {
       const n = document.createElement('span'); n.className = 'n'; n.textContent = m.n;
       li.appendChild(n);
       li.appendChild(document.createTextNode(m.text));
+      if (m.tags) {
+        const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = m.tags.join('・');
+        li.appendChild(tag);
+      }
       el.appendChild(li);
     });
     el.scrollTop = el.scrollHeight;
@@ -1069,12 +1136,14 @@ function aiTurn() {
   }
 
   turn = 'player';
-  if (isInCheck('player')) {
+  const inCheck = isInCheck('player');
+  if (inCheck) {
     showCheck();
     document.getElementById('status').textContent = '王手！あなたの番です';
   } else {
     document.getElementById('status').textContent = 'あなたの番です';
   }
+  announceStrategies(inCheck ? 1500 : 0);
   updateMood();
 }
 
@@ -1128,6 +1197,169 @@ function toggleFx() {
   try { localStorage.setItem(FX_KEY, fxOff() ? 'on' : 'off'); } catch (e) {}
   applyFxSetting();
   setMood(document.body.dataset.mood || 'even');
+}
+
+// ---- 戦法・囲いの判定と表示 ----
+// 盤面が決まった駒の配置になったら成立とみなす。座標はすべて「その陣営から見た筋・段」で書き、
+// 後手（AI）は盤を180度回して同じ定義で判定する。
+const OPENING_MOVES = 30; // 振り飛車などを序盤の形として認める手数
+
+function viewOf(side) {
+  const at = (file, rank) => {
+    const r = side === 'player' ? rank - 1 : 9 - rank;
+    const c = side === 'player' ? 9 - file : file - 1;
+    const p = board[r][c];
+    return p && p.o === side ? p.k : null;
+  };
+  const find = kind => {
+    const list = [];
+    for (let file = 1; file <= 9; file++) for (let rank = 1; rank <= 9; rank++) if (at(file, rank) === kind) list.push({ file, rank });
+    return list;
+  };
+  const has = (kind, ...squares) => squares.some(([f, r]) => at(f, r) === kind);
+  const rookOn = (file, minRank) => find('HI').some(p => p.file === file && p.rank >= minRank);
+  return { at, find, has, rookOn, moves: kifu.length, opening: kifu.length <= OPENING_MOVES };
+}
+
+const furi = file => v => v.opening && v.rookOn(file, 6);
+const FURI_IDS = ['nakabisha', 'shiken', 'sanken', 'mukai'];
+
+const STRATEGIES = [
+  // 振り飛車
+  { id: 'nakabisha', type: '戦法', name: '中飛車', test: furi(5),
+    aim: '飛車を真ん中の5筋に回し、5筋の歩を突いて中央から攻めます。左右どちらにも攻めを向けられる戦法です。' },
+  { id: 'shiken', type: '戦法', name: '四間飛車', test: furi(6),
+    aim: '飛車を6筋に回す、振り飛車の代表的な戦法です。玉を固めてから、相手の攻めを受け止めて反撃します。' },
+  { id: 'sanken', type: '戦法', name: '三間飛車', test: furi(7),
+    aim: '飛車を7筋に回し、7筋の歩を突いて攻めます。攻めにも守りにも切り替えやすい戦法です。' },
+  { id: 'mukai', type: '戦法', name: '向かい飛車', test: furi(8),
+    aim: '飛車を8筋に回し、相手の飛車と同じ筋で向かい合わせます。相手が攻めてきた筋で、そのまま飛車をぶつけて反撃できます。' },
+  { id: 'ishida', type: '戦法', name: '石田流', test: v => v.has('HI', [7, 6]) && v.has('KE', [7, 7]),
+    aim: '三間飛車から飛車を7六に浮かせ、桂を7七に跳ねた攻めの形です。飛車と角と桂が力を合わせて一気に攻めかかります。' },
+  // 居飛車の攻め
+  { id: 'bougin', type: '戦法', name: '棒銀', test: v => v.rookOn(2, 5) && v.has('GI', [2, 6], [2, 5], [1, 5]),
+    aim: '飛車の前に銀をまっすぐ進め、2筋の歩と一緒に相手の角の上を突き破ります。分かりやすくて強い攻めです。' },
+  { id: 'hayakuri', type: '戦法', name: '早繰り銀', test: v => v.rookOn(2, 5) && v.has('GI', [4, 6], [3, 5]),
+    aim: '銀を3七から4六、3五へと素早く進め、3筋から攻めます。棒銀より1つ横の筋から攻めるのが特徴です。' },
+  { id: 'koshikake', type: '戦法', name: '腰掛け銀', test: v => v.moves <= 40 && v.has('GI', [5, 6]),
+    aim: '銀を5六に置き、攻めにも守りにも使える位置で構えます。角換わりでよく使われる、釣り合いのよい形です。' },
+  { id: 'migishiken', type: '戦法', name: '右四間飛車',
+    test: v => v.opening && v.rookOn(4, 6) && v.find('OU').some(p => p.file >= 5),
+    aim: '飛車を4筋に回し、銀や桂と力を合わせて4筋を集中して攻めます。破壊力の高い攻めです。' },
+  { id: 'sode', type: '戦法', name: '袖飛車', test: furi(3),
+    aim: '飛車を3筋に移し、相手の角の上にあたる3筋を集中して攻めます。' },
+  { id: 'yokofu', type: '戦法', name: '横歩取り', test: v => v.opening && v.has('HI', [3, 4]),
+    aim: '飛車で相手の3筋の歩を取り、歩を1枚得します。飛車と角が飛び交う激しい戦いになりやすい戦法です。' },
+  // 奇襲
+  { id: 'onigoroshi', type: '奇襲', name: '鬼殺し', test: v => v.moves <= 12 && v.has('KE', [6, 5]),
+    aim: '序盤に桂を6五まで跳ね、相手の陣地の弱いところをいきなり突く奇襲です。正しく受けないと一気に崩れます。' },
+  { id: 'hashi', type: '戦法', name: '端攻め', test: v => v.moves > 20 && v.find('KY').some(p => (p.file === 1 || p.file === 9) && p.rank <= 5),
+    aim: '盤の端の筋で歩をぶつけ、香車を走らせて、相手の囲いを端から崩します。' },
+  // 囲い
+  { id: 'mino', type: '囲い', name: '美濃囲い', test: v => v.has('OU', [2, 8]) && v.has('GI', [3, 8]) && v.has('KI', [4, 9]),
+    aim: '玉を右側に移し、金銀3枚で固めます。横からの攻めに強く、振り飛車で最もよく使われる囲いです。' },
+  { id: 'takamino', type: '囲い', name: '高美濃囲い',
+    test: v => v.has('OU', [2, 8]) && v.has('GI', [3, 8]) && v.has('KI', [4, 9]) && v.has('KI', [4, 7]),
+    aim: '美濃囲いの金を4七に上げた形です。上からの攻めにも強くなります。' },
+  { id: 'gingan', type: '囲い', name: '銀冠', test: v => v.has('OU', [2, 8]) && v.has('GI', [2, 7]) && v.has('KI', [3, 8]),
+    aim: '銀を2七に上げて、玉の真上を守る形です。上からの攻めにとても強い囲いです。' },
+  { id: 'hidarimino', type: '囲い', name: '左美濃', test: v => v.has('OU', [8, 8]) && v.has('GI', [7, 8]) && v.has('KI', [6, 9]),
+    aim: '美濃囲いを左側に作った形です。少ない手数で堅く囲えるので、振り飛車を相手にするときによく使われます。' },
+  { id: 'yagura', type: '囲い', name: '矢倉囲い',
+    test: v => v.has('OU', [8, 8]) && v.has('KI', [7, 8]) && v.has('GI', [7, 7]) && v.has('KI', [6, 7]),
+    aim: '金銀3枚を玉の上に積み上げる、居飛車の代表的な囲いです。正面からの攻めに強い形です。' },
+  { id: 'funa', type: '囲い', name: '舟囲い', test: v => v.has('OU', [7, 8]) && v.has('KI', [6, 9]) && v.has('KI', [5, 8]),
+    aim: '玉を左へ寄せるだけの、少ない手数でできる居飛車の囲いです。早く戦いを始めたいときに使います。' },
+  { id: 'gangi', type: '囲い', name: '雁木囲い', test: v => v.has('KI', [7, 8]) && v.has('GI', [6, 7]) && v.has('GI', [5, 7]),
+    aim: '銀2枚を横に並べて玉の前を守る囲いです。上からの攻めに強く、すぐ攻めの形にも移れます。' },
+  { id: 'ibianaguma', type: '囲い', name: '居飛車穴熊',
+    test: v => v.has('OU', [9, 9]) && v.has('KY', [9, 8]) && ['GI', 'KI'].some(k => v.has(k, [8, 8], [8, 9], [7, 9])),
+    aim: '玉を隅の9九にもぐらせ、香車でふたをして金銀で固めます。王手がかかりにくい、最も堅い囲いの一つです。' },
+  { id: 'furianaguma', type: '囲い', name: '振り飛車穴熊',
+    test: v => v.has('OU', [1, 9]) && v.has('KY', [1, 8]) && ['GI', 'KI'].some(k => v.has(k, [2, 8], [2, 9], [3, 9])),
+    aim: '振り飛車で玉を隅の1九にもぐらせた形です。堅さを生かして、駒をぶつけ合う戦いに持ちこみます。' },
+];
+
+// 両者の形の組み合わせで決まる戦型
+const isFuri = side => FURI_IDS.some(id => announced[side].has(id));
+const isIbisha = side => !isFuri(side) && viewOf(side).rookOn(2, 5);
+const MATCHUPS = [
+  { id: 'aifuri', name: '相振り飛車', test: () => isFuri('player') && isFuri('ai'),
+    aim: '両者とも振り飛車です。玉が同じ側に集まるので、ふだんと違う囲い方をして、玉の上から攻め合う戦いになります。' },
+  { id: 'taikou', name: '対抗形',
+    test: () => kifu.length >= 12 && ((isFuri('player') && isIbisha('ai')) || (isFuri('ai') && isIbisha('player'))),
+    aim: '居飛車と振り飛車の戦いです。玉が盤の反対側どうしに分かれるので、囲いを固めてから攻め合う展開になりやすい戦型です。' },
+  { id: 'kakugawari', name: '角換わり',
+    test: () => kifu.length <= OPENING_MOVES && hands.player.includes('KA') && hands.ai.includes('KA'),
+    aim: '序盤で角を交換した戦型です。お互いに角を打ちこめる場所が多いので、すきを作らない駒組みが大切になります。' },
+];
+
+// 新しく成立した戦法を探し、表示の順番待ちに入れて、直前の手の棋譜に印を付ける
+function announceStrategies(delay) {
+  const found = [];
+  for (const side of ['player', 'ai']) {
+    const v = viewOf(side);
+    for (const s of STRATEGIES) {
+      if (announced[side].has(s.id) || !s.test(v)) continue;
+      announced[side].add(s.id);
+      found.push({ side, label: (side === 'player' ? 'あなたの' : '相手の') + s.type, name: s.name, aim: s.aim });
+    }
+  }
+  for (const m of MATCHUPS) {
+    if (announced.both.has(m.id) || !m.test()) continue;
+    announced.both.add(m.id);
+    found.push({ side: 'both', label: '戦型', name: m.name, aim: m.aim });
+  }
+  if (found.length === 0) return;
+
+  const last = kifu[kifu.length - 1];
+  if (last) { last.tags = (last.tags || []).concat(found.map(f => f.name)); renderKifu(); }
+  strategyQueue.push(...found);
+  if (!strategyPlaying) { strategyPlaying = true; strategyTimer = setTimeout(playNextStrategy, delay); }
+}
+
+const STRATEGY_MS = 4200;
+let strategyQueue = [];
+let strategyPlaying = false;
+let strategyTimer = null;
+let strategyShownAt = 0;
+
+function playNextStrategy() {
+  const el = document.getElementById('strategy-banner');
+  el.classList.remove('show', 'out');
+  const item = strategyQueue.shift();
+  if (!item) { strategyPlaying = false; return; }
+
+  el.className = item.side;
+  el.style.setProperty('--st-ms', STRATEGY_MS + 'ms');
+  el.querySelector('.st-label').textContent = item.label;
+  const nameEl = el.querySelector('.st-name');
+  nameEl.textContent = item.name;
+  // 名前の長さに合わせて、盤の幅に収まる大きさにする
+  nameEl.style.fontSize = 'calc(var(--board-size) * ' + Math.min(0.17, 0.8 / item.name.length) + ')';
+  el.querySelector('.st-aim').textContent = item.aim;
+  void el.offsetWidth; // 続けて表示するときも毎回アニメーションが最初から再生されるようにする
+  el.classList.add('show');
+  strategyShownAt = Date.now();
+  strategyTimer = setTimeout(playNextStrategy, STRATEGY_MS);
+}
+
+// 表示中に画面を触ったら、早めに閉じて次へ進む
+function dismissStrategy() {
+  const el = document.getElementById('strategy-banner');
+  if (!el.classList.contains('show') || el.classList.contains('out')) return;
+  if (Date.now() - strategyShownAt < 600) return; // 戦法を成立させた手のタップでは閉じない
+  clearTimeout(strategyTimer);
+  el.classList.add('out');
+  strategyTimer = setTimeout(playNextStrategy, 250);
+}
+
+function clearStrategyBanner() {
+  clearTimeout(strategyTimer);
+  strategyQueue = [];
+  strategyPlaying = false;
+  const el = document.getElementById('strategy-banner');
+  if (el) el.classList.remove('show', 'out');
 }
 
 // 「王手」を筆文字で盤の上に重ねて表示する
@@ -1186,6 +1418,7 @@ function render() {
 }
 
 if (document.fonts && document.fonts.load) document.fonts.load('40px "Yuji Syuku"');
+document.addEventListener('click', dismissStrategy);
 document.getElementById('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleNameSubmit(true); });
 loadRanking();
 renderSavedGames();
